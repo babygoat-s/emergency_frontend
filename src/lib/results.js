@@ -1,3 +1,5 @@
+import { publicErrorMessage } from './error-messages.js'
+
 export const EMPTY_STREAM = {
   data: null,
   transcriptSequence: 0,
@@ -22,7 +24,10 @@ export function mergeStreamEvent(previous, event) {
   }
   if (stage === 'analysis' && sequence >= previous.settledSequence) {
     next.settledSequence = sequence
-    next.analysisError = event.error || null
+    next.analysisError = event.error ? {
+      code: event.error.code,
+      message: publicErrorMessage(event.error.code),
+    } : null
     if (data.analysis) {
       next.data.analysis = data.analysis
       next.analysisSequence = sequence

@@ -108,3 +108,15 @@ test('microphone permission denial returns an actionable message and releases th
   await assert.rejects(startRealtime({ language: 'ko', onEvent: () => {}, onError: () => {}, onLevel: () => {} }), { code: 'MIC_DENIED' })
   assert.equal(state.closedContexts, 1)
 })
+
+test('fatal WebSocket errors never expose upstream diagnostic messages', async (t) => {
+  const { state } = setup(t)
+  await startRealtime({ language: 'ko', onEvent: () => {}, onError: (error) => state.errors.push(error), onLevel: () => {} })
+  state.socket.onmessage({ data: JSON.stringify({ type: 'error', error: {
+    code: 'GEMINI_API_KEY_REJECTED',
+    message: 'Gemini HTTP 400 INVALID_ARGUMENT .env secret-test',
+  } }) })
+  assert.equal(state.errors.length, 1)
+  assert.equal(state.errors[0].message, '음성 분석을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.')
+  assert.equal(state.stoppedTracks, 1)
+})

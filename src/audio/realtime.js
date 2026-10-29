@@ -1,4 +1,5 @@
 import { ApiError, realtimeUrl } from '../api/analysis.js'
+import { publicErrorMessage } from '../lib/error-messages.js'
 
 export async function startRealtime({ language, signal, onEvent, onError, onLevel }) {
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -75,7 +76,7 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
         catch { fail(new ApiError('실시간 응답을 읽지 못했어요.', 'INVALID_RESPONSE')); return }
         if (event.type === 'ready') { clearTimeout(openTimer); resolve(); return }
         if (event.type === 'error') {
-          const error = new ApiError(event.error?.message || '음성 분석 중 오류가 발생했어요.', event.error?.code)
+          const error = new ApiError(publicErrorMessage(event.error?.code), event.error?.code)
           reject(error)
           fail(error)
           return
