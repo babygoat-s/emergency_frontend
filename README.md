@@ -1,6 +1,6 @@
 # 119 긴급 음성 분석기
 
-기존 emergency_backend의 FastAPI API에 연결하는 Vite + React 프런트엔드입니다. 데스크톱·태블릿·모바일에 맞게 구현했습니다.
+`emergency_backend`의 FastAPI API에 연결하는 Vite + React 반응형 프런트엔드입니다. 파일 업로드·실시간 녹음·현재 분석 결과를 한 화면에서 사용합니다. DB와 기록 API가 없어 분석 기록 메뉴와 자동 저장은 없습니다.
 
 ## 실행
 
@@ -19,37 +19,44 @@ npm install
 npm run dev
 ```
 
-브라우저에서 <http://localhost:5173>에 접속합니다. 의존성이 설치되어 있으면 npm install은 생략할 수 있습니다. 기본 백엔드 주소는 http://127.0.0.1:8000이며 Vite가 /api의 HTTP와 WebSocket을 함께 프록시합니다.
+브라우저에서 <http://localhost:5173>에 접속합니다. 의존성이 설치되어 있으면 `npm install`은 생략할 수 있습니다. Vite는 `/api`의 HTTP와 WebSocket을 기본 백엔드 `http://127.0.0.1:8000`으로 프록시합니다.
 
-실제 상황 분석에는 백엔드 .env의 GEMINI_API_KEY와 Whisper 실행 환경이 필요합니다. 키가 없어도 백엔드의 고정 예시 결과를 확인할 수 있습니다. 상태 API는 서버 응답과 키 입력 여부만 확인하며 모델 준비나 외부 API 연결 성공을 보장하지 않습니다.
+실제 분석에는 백엔드 `.env`의 `GEMINI_API_KEY`와 Whisper 실행 환경이 필요합니다. 기본 Gemini 모델은 `gemini-3.5-flash-lite`이며 백엔드의 `GEMINI_MODEL`이 우선합니다. 설정을 바꾸면 백엔드를 재시작하세요. 키가 없어도 서버가 실행 중이면 고정 예시를 확인할 수 있습니다. 상태 표시는 서버 응답과 키 입력 여부만 확인하며 실제 모델 호출 성공을 보장하지 않습니다.
+
+## 분석 결과의 의미
+
+현재 기본 구성에서 Whisper는 음성을 텍스트로 변환합니다. 별도 증상 분류기가 연결되지 않아 증상·긴급도·상황 요약·확인 질문은 Gemini가 생성합니다. 서버가 허용된 증상 코드·결과 구조를 검증하고 증상 라벨과 인용을 정리하지만, 별도 학습 모델이나 응급 매뉴얼 검색을 거친 결과는 아닙니다. Gemini 증상의 `score`는 `null`이며 임의 신뢰도를 표시하지 않습니다.
+
+긴급도는 담당자 판단을 보조하는 범주이며 KTAS 등급이나 확정 진단이 아닙니다. 화자와 음성 상태는 연결된 모델이 실제 값을 반환한 경우에만 표시합니다. 예시 결과는 실제 AI 분석과 구별해 표시합니다.
 
 ## 기능
 
-- 파일 업로드: 드래그 앤 드롭, 파일 선택, 음성 미리 듣기, 언어 선택, 분석·취소.
-- 파일 검사: 서버 설정에 따른 확장자·용량 검사, 브라우저에서 길이를 읽을 수 있는 파일의 재생 시간 검사. 디코딩과 최종 검증은 백엔드가 수행합니다.
-- 실시간 녹음: AudioWorklet에서 16 kHz, mono, signed PCM16 little-endian으로 변환해 100 ms 단위로 전송. 종료 시 마지막 프레임을 전송하고 최종 분석까지 기다립니다.
-- 분석 결과: 전사와 구간 시간, 상황 요약, 긴급도와 근거, 증상과 원문, 확인 질문. 모델이 실제 값을 반환할 때만 화자와 음성 상태를 표시합니다.
-- 예시 체험: 백엔드의 고정 예시를 실제 AI 결과와 구별해 표시. API가 제공하지 않는 예시 음성 재생 버튼은 없습니다.
-- 결과 다운로드: 현재 결과를 UTF-8 텍스트로 직접 다운로드.
-- 안내: 서버 연결, 마이크 권한·전송 오류, 분석 지연, 예시 여부와 담당자 검토 안내.
+- 파일 업로드: 드래그 앤 드롭·파일 선택·미리 듣기·언어 선택·분석 취소.
+- 파일 검사: 서버 설정의 확장자·용량과 읽을 수 있는 재생 시간 검사. 최종 디코딩·검증은 백엔드에서 수행.
+- 실시간 녹음: AudioWorklet으로 16 kHz, 모노, PCM16 little-endian을 100ms 단위 전송. 종료 시 마지막 프레임과 최종 분석 처리.
+- 결과: 전사·시간 구간·상황 요약·긴급도·증상과 원문·확인 질문. 현재 결과를 UTF-8 텍스트로 다운로드.
+- 예시: 백엔드 고정 예시 조회. 샘플 음성 재생 기능은 API가 제공하지 않아 포함하지 않음.
+- 사용 안내: 파일·마이크 사용 절차, 서버 상태와 처리 지연 안내.
 
-DB와 기록 API가 없는 백엔드에 맞춰 분석 기록 메뉴·목록·자동 저장은 구현하지 않았습니다. 결과는 React 메모리에만 존재하며 새로고침하면 사라집니다. 음성은 분석을 위해 백엔드로 전송되며, 백엔드는 구성된 모델 제공자를 호출할 수 있습니다.
+REST와 WebSocket의 서버 오류 메시지를 화면에 그대로 표시하지 않습니다. 입력 오류·요청 과다·시간 초과 등은 프런트엔드의 고정 문구로 안내하고 나머지는 일반 분석 실패 문구로 표시합니다. 상세 HTTP 상태·내부 오류 코드·키 설정·모델 요청 상세는 사용자 화면과 다운로드에 포함하지 않습니다. 개발자 진단은 백엔드 README의 `check_gemini.py`를 사용합니다.
+
+현재 결과는 React 메모리에만 존재해 새로고침하면 사라집니다. 음성은 분석을 위해 백엔드로 전송되며 전사 등은 백엔드가 구성한 Gemini API로 전송될 수 있습니다. 필요한 결과는 새로고침 전에 직접 다운로드하세요.
 
 ## 연결 API
 
-| 기능 | 메서드 | 경로 |
+| 기능 | HTTP | Path |
 | --- | --- | --- |
-| 서버 상태 | GET | /api/v1/health |
-| 지원 형식·용량·언어·길이 설정 | GET | /api/v1/analysis/config |
-| 파일 전체 분석 | POST multipart (file, language) | /api/v1/analysis/file |
-| 고정 예시 | GET | /api/v1/analysis/example |
-| 실시간 분석 | WebSocket | /api/v1/analysis/realtime |
+| 서버 상태 | GET | `/api/v1/health` |
+| 분석 설정 | GET | `/api/v1/analysis/config` |
+| 파일 전체 분석 | POST | `/api/v1/analysis/file` |
+| 고정 예시 | GET | `/api/v1/analysis/example` |
+| 실시간 분석 | WebSocket | `/api/v1/analysis/realtime` |
 
-실시간 연결은 start → ready → PCM binary → finish → finished 순서입니다. audio와 analysis의 sequence를 각각 관리해 응답이 역순으로 도착해도 최신 전사를 유지합니다. 상황 분석이 지연되면 이전 분석임을 표시하며 전사를 계속 갱신합니다.
+Request body와 Response body는 백엔드 `docs/API.md`를 참고하세요. 실시간은 `start → ready → PCM binary → finish → finished` 순서입니다. 서로 다른 구간의 응답이 역순으로 도착해도 최신 전사가 유지되도록 audio와 analysis sequence를 따로 관리합니다. 최신 분석이 지연되면 이전 구간 결과임을 표시하며, 녹음 중 화면을 강제로 이동하지 않습니다. 파일·예시 분석 완료 시 결과 영역으로 이동합니다.
 
-## 환경 설정
+## 환경 설정과 배포
 
-필요할 때 .env.example을 .env.local로 복사해 변경합니다.
+필요한 경우 `.env.example`을 `.env.local`로 복사해 변경합니다.
 
 ```dotenv
 API_PROXY_TARGET=http://127.0.0.1:8000
@@ -57,28 +64,29 @@ API_PROXY_TARGET=http://127.0.0.1:8000
 # VITE_API_BASE_URL=https://your-api.example.com
 ```
 
-- 개발 및 npm run preview는 Vite 프록시를 사용합니다.
-- npm run build의 정적 결과물에는 Vite 프록시가 포함되지 않습니다. 운영 서버에 /api HTTP·WebSocket 프록시를 구성하거나 VITE_API_BASE_URL을 지정하고 다시 빌드하세요.
-- 다른 origin에 직접 연결한다면 백엔드 CORS_ORIGINS에 프런트엔드 origin을 허용해야 합니다. WebSocket도 같은 origin 검사 정책을 따릅니다.
-- 마이크는 localhost 또는 HTTPS에서 동작합니다. 모바일 기기로 접속할 때는 HTTPS가 필요합니다.
-- HTTPS 프런트엔드에서는 백엔드도 HTTPS/WSS를 사용해야 합니다.
-- VITE_ 변수는 브라우저에 노출됩니다. Gemini 키와 다른 비밀 값은 프런트엔드에 넣지 마세요.
-- Noto Sans KR 웹폰트 서버에 연결할 수 없으면 시스템 한글 글꼴로 표시합니다.
+- 개발과 `npm run preview`는 Vite 프록시를 사용합니다.
+- `npm run build`의 정적 결과물에는 프록시가 포함되지 않습니다. 운영 서버에 `/api` HTTP·WebSocket 프록시를 구성하거나 `VITE_API_BASE_URL`을 설정하고 다시 빌드하세요.
+- 다른 origin에 직접 연결하면 백엔드 `CORS_ORIGINS`에 프런트엔드 origin을 허용해야 합니다. WebSocket도 같은 정책을 따릅니다.
+- 마이크는 localhost 또는 HTTPS에서 사용합니다. 모바일 기기 접속에는 HTTPS가 필요합니다.
+- HTTPS 프런트엔드에서는 HTTPS/WSS 백엔드를 사용하세요.
+- `VITE_` 변수는 브라우저에 노출됩니다. Gemini 키는 백엔드에서만 관리하세요.
+- Noto Sans KR 웹폰트에 연결하지 못하면 시스템 한글 글꼴을 사용합니다.
 
 ## 프로젝트 구조
 
 ```text
 src/
-  App.jsx                 화면과 사용자 작업 상태
-  App.css                 반응형 레이아웃
-  index.css               기본 스타일
-  api/analysis.js         REST 요청·오류·취소·WebSocket 주소
-  audio/realtime.js       녹음·연결·종료·정리
-  audio/pcm-worklet.js    PCM16 프레임 변환
-  components/Icon.jsx    SVG 아이콘
-  components/Results.jsx 분석 결과와 다운로드
-  lib/results.js         응답 병합·파일 검증·시간 표시
-tests/                    응답 순서·PCM·종료·취소 테스트
+  App.jsx                   화면과 사용자 작업 상태
+  App.css                   반응형 레이아웃
+  index.css                 기본 스타일
+  api/analysis.js           REST 요청·취소·WebSocket 주소
+  audio/realtime.js         녹음·연결·종료·정리
+  audio/pcm-worklet.js      PCM16 프레임 변환
+  components/Icon.jsx      SVG 아이콘
+  components/Results.jsx   분석 결과와 다운로드
+  lib/results.js           응답 병합·파일 검증·시간 표시
+  lib/error-messages.js    사용자용 고정 오류 문구
+tests/                      PCM·응답 순서·종료·취소·오류 비노출 테스트
 ```
 
 ## 검증
@@ -89,4 +97,4 @@ npm run lint
 npm run build
 ```
 
-테스트는 Node 내장 테스트 러너를 사용하며 외부 모델이나 실제 마이크를 사용하지 않습니다.
+자동 테스트는 Node 내장 테스트 러너를 사용하며 실제 마이크·외부 AI 모델을 호출하지 않습니다. 실제 모델 연결 진단과 설정은 백엔드 README에서 관리합니다.

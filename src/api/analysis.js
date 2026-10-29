@@ -1,3 +1,5 @@
+import { publicErrorMessage } from '../lib/error-messages.js'
+
 const configuredBase = (import.meta.env?.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
 
 export const API_BASE = configuredBase
@@ -30,7 +32,8 @@ async function request(path, { signal, timeout = 15000, ...options } = {}) {
     })
     const body = await response.json().catch(() => null)
     if (!response.ok) {
-      throw new ApiError(body?.error?.message || '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.', body?.error?.code || `HTTP_${response.status}`)
+      const code = body?.error?.code || `HTTP_${response.status}`
+      throw new ApiError(publicErrorMessage(code), code)
     }
     if (!body) throw new ApiError('서버 응답을 읽지 못했어요.', 'INVALID_RESPONSE')
     return body

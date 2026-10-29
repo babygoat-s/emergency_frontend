@@ -37,7 +37,7 @@ test('an unavailable analysis keeps transcript and previous analysis with separa
   state = mergeStreamEvent(state, event(2, 'analysis', { ...payload('새 누적 음성'), status: 'unavailable' }, { message: '분석 지연' }))
   assert.equal(state.data.transcript.text, '새 누적 음성')
   assert.equal(state.data.analysis.summary, '기존 분석')
-  assert.equal(state.analysisError.message, '분석 지연')
+  assert.equal(state.analysisError.message, '음성 분석을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.')
   assert.equal(state.analysisSequence, 1)
   assert.equal(state.settledSequence, 2)
 })
