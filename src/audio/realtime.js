@@ -52,7 +52,9 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
       throw new ApiError('이 브라우저는 실시간 녹음을 지원하지 않아요. 음성 파일을 업로드해 주세요.', 'MIC_UNSUPPORTED')
     }
     await context.resume()
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+    } })
     assertActive()
     await context.audioWorklet.addModule(new URL('./pcm-worklet.js', import.meta.url))
     assertActive()

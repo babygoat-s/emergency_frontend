@@ -4,10 +4,19 @@ import { EMPTY_STREAM, mergeStreamEvent, selectQuestions, validateFile, formatTi
 
 const payload = (text, analysis = null, symptoms = []) => ({
   transcript: { text, segments: [] }, analysis, symptoms,
-  speakers: { available: false }, audio_signals: { available: false },
+  speakers: { available: false },
   status: analysis ? 'completed' : 'pending', warnings: [], is_demo: false,
 })
 const event = (sequence, stage, data, error) => ({ type: 'update', sequence, stage, data, error })
+
+test('late RAG analysis cannot replace manual questions for newer speech', () => {
+  const newest = { questions: [{ question: '새 질문' }], status: 'ready' }
+  let state = mergeStreamEvent(EMPTY_STREAM, event(2, 'audio', { ...payload('새 발화'), rag: newest, manual_grounded: true }))
+  state = mergeStreamEvent(state, event(1, 'analysis', { ...payload('이전 발화'), rag: { questions: [{ question: '이전 질문' }] } }))
+  assert.equal(state.data.rag, newest)
+  assert.equal(state.ragSequence, 2)
+  assert.equal(state.data.manual_grounded, true)
+})
 
 test('late analysis cannot replace the latest transcript or local symptoms', () => {
   const local = [{ code: 'bleeding', label: '출혈' }]

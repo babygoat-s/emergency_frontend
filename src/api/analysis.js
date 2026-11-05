@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG = {
   realtime_window_seconds: 6,
   koelectra_symptom_labels: [],
   example_preview: null,
+  rag_enabled: false,
 }
 
 export class ApiError extends Error {
@@ -52,6 +53,19 @@ async function request(path, { signal, timeout = 15000, ...options } = {}) {
 export const getHealth = (signal) => request('/health', { signal, timeout: 6000 })
 export const getConfig = (signal) => request('/analysis/config', { signal, timeout: 6000 })
 export const getExample = (signal) => request('/analysis/example', { signal })
+
+export async function analyzeText(text, signal) {
+  const conversation = text.split('\n').map((line) => line.trim()).filter(Boolean).map((line, index) => {
+    const prefix = line.match(/^(신고자|상담원|접수 담당자)\s*[:：]\s*/)
+    return { id: String(index), speaker: prefix ? (prefix[1] === '신고자' ? 'caller' : 'operator') : 'unknown', text: prefix ? line.slice(prefix[0].length) : line }
+  })
+  const rag = await request('/rag/recommend', { method: 'POST', signal, timeout: 45000,
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation }) })
+  return { status: rag.llm_status === 'completed' ? 'completed' : 'unavailable', rag,
+    transcript: { text, provider: 'text', segments: [] }, symptoms: [], analysis: null,
+    local_questions: rag.questions.map((q) => ({ question: q.question, purpose: q.reason })),
+    manual_grounded: rag.questions.length > 0, warnings: [] }
+}
 
 export function analyzeFile(file, language, signal) {
   const body = new FormData()
