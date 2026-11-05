@@ -1,26 +1,45 @@
 import Icon from './Icon'
-import { formatTime } from '../lib/results'
+import { formatTime, selectQuestions } from '../lib/results'
 
-const urgencyLabels = { critical: ['긴급', 'critical'], high: ['높음', 'high'], moderate: ['보통', 'moderate'], low: ['낮음', 'low'], unknown: ['판단 보류', 'unknown'] }
-const speakerLabels = { caller: '신고자', operator: '접수 담당자', unknown: '음성' }
+const urgencyLabels = { minimal: '최하', low: '하', moderate: '중', high: '상', critical: '최상' }
+const speakerLabels = { caller: '신고자', operator: '접수 담당자', unknown: '화자 미확인' }
 
-export default function Results({ result, streamState, operation }) {
+export function UrgencyScale() {
+  return <section className="urgency-scale" aria-labelledby="urgency-scale-title">
+    <h3 id="urgency-scale-title">긴급도 5단계</h3>
+    <ol aria-label="낮은 긴급도부터 높은 긴급도까지">
+      {Object.entries(urgencyLabels).map(([level, label]) => <li key={level} className={`badge urgency-${level}`}>{label}</li>)}
+    </ol>
+    <p>최상에 가까울수록 더 긴급해요. 판단에 필요한 정보가 부족하면 ‘판단 보류’로 표시해요.</p>
+  </section>
+}
+
+export default function Results({ result, streamState, operation, symptomCount = 0 }) {
   const data = result || streamState.data
   const busy = ['file', 'connecting', 'recording', 'finishing'].includes(operation)
   const analysis = data?.analysis
-  const stale = !result && streamState.analysisSequence < streamState.transcriptSequence && analysis
-  const [urgency, urgencyClass] = urgencyLabels[analysis?.urgency?.level] || urgencyLabels.unknown
+  const latestSpeechSequence = streamState.localQuestionSequence || streamState.transcriptSequence
+  const stale = !result && streamState.analysisSequence < latestSpeechSequence && analysis
+  const urgencyLevel = analysis?.urgency?.level
+  const urgencyClass = Object.hasOwn(urgencyLabels, urgencyLevel) ? urgencyLevel : 'unknown'
+  const urgency = urgencyLabels[urgencyClass] || '판단 보류'
   const symptoms = data?.symptoms || analysis?.symptoms || []
   const segments = data?.transcript?.segments || []
+  const { local, questions } = selectQuestions(result, streamState)
+  let symptomStatus = '발화가 인식되면 증상을 분류해요.'
+  if (data?.transcript?.text) symptomStatus = busy ? '전사된 내용을 분류하고 있어요.' : '증상 분류 결과를 사용할 수 없어요.'
+  if (data?.symptom_provider || analysis) symptomStatus = '현재 전사에서 감지된 증상이 없어요.'
+  if (data?.symptom_provider === 'koelectra' && symptomCount) symptomStatus = `현재 전사에서 모델이 분류하는 ${symptomCount}종 증상 중 감지된 항목이 없어요.`
+  if (!result && streamState.symptomError) symptomStatus = streamState.symptomError
 
   function downloadResult() {
     const text = [
       '119 긴급 음성 분석 결과', data.is_demo ? '[고정 예시 결과]' : '',
       '\n[변환된 텍스트]', data.transcript.text,
       '\n[상황 요약]', analysis?.summary || '분석 결과 없음',
-      '\n[감지된 증상]', ...symptoms.map((item) => `- ${item.label}${item.evidence ? `: ${item.evidence}` : ''}`),
+      '\n[감지된 증상]', ...(symptoms.length ? symptoms.map((item) => `- ${item.label}${item.evidence ? `: ${item.evidence}` : ''}`) : [symptomStatus]),
       '\n[긴급도]', `${urgency}${analysis?.urgency?.reason ? `: ${analysis.urgency.reason}` : ''}`,
-      '\n[확인 질문]', ...(analysis?.recommended_questions || []).map((item) => `- ${item.question} (${item.purpose})`),
+      local ? '\n[기본 확인 질문]' : '\n[확인 질문]', ...questions.map((item) => `- ${item.question} (${item.purpose})`),
       stale ? '\n※ 상황 분석은 이전 음성 구간의 결과입니다.' : '',
       streamState.analysisError && !result ? `\n※ 상황 분석 오류: ${streamState.analysisError.message}` : '',
       '\n[안내]', ...(data.warnings || []),
@@ -58,11 +77,18 @@ export default function Results({ result, streamState, operation }) {
           {segments.length ? segments.map((segment, index) => <div className="transcript-segment" key={`${segment.start}-${index}`}><span className="segment-time">{formatTime(segment.start)}</span><div>{data.transcript.diarization_available && <span className="speaker-label">{speakerLabels[segment.speaker] || '음성'}</span>}<p>{segment.text}</p></div></div>) : <p>{data.transcript?.text || (data.status === 'no_speech' ? '아직 인식된 발화가 없어요. 마이크에 가까이 말해 주세요.' : '전사 결과를 기다리고 있어요.')}</p>}
         </div>
       </div>
-      {analysis ? <>
-        <div className="summary-section"><div className="subheading"><h3><Icon name="sparkles" size={17} />상황 요약</h3><span className={`badge urgency-${urgencyClass}`}><span className="status-dot" />긴급도 · {urgency}</span></div><p className="summary-text">{analysis.summary}</p><p className="urgency-reason">{analysis.urgency.reason}</p></div>
-        <div className="symptom-section"><h3>감지된 증상 <span className="count">{symptoms.length}</span></h3>{symptoms.length ? <div className="symptom-list">{symptoms.map((symptom) => <div className="symptom-item" key={symptom.code}><span className="symptom-tag">{symptom.label}</span>{symptom.evidence && <span className="symptom-evidence">“{symptom.evidence}”</span>}</div>)}</div> : <p className="muted small">텍스트에서 추출된 증상이 없어요.</p>}</div>
-        <div className="questions-section"><h3><Icon name="help" size={17} />이어서 확인해 보세요</h3><ol className="question-list">{analysis.recommended_questions.map((question, index) => <li key={question.question}><span className="question-number">{index + 1}</span><div><p>{question.question}</p><span>{question.purpose}</span></div></li>)}</ol><p className="manual-note">담당자 검토용 질문이며 공식 응급 매뉴얼에 근거한 질문은 아닙니다.</p></div>
-      </> : <><div className="analysis-pending"><Icon name={streamState.analysisError ? 'info' : 'sparkles'} size={19} /><p>{data.status === 'no_speech' ? busy ? '음성이 인식되면 증상과 상황을 분석합니다.' : '인식된 발화가 없어요. 마이크를 확인한 뒤 다시 녹음해 주세요.' : streamState.analysisError ? '상황 분석을 완료하지 못했어요. 위 전사 내용을 확인해 주세요.' : busy ? '전사된 내용을 바탕으로 상황과 증상을 분석하고 있어요.' : '상황 분석 결과가 없어요. 음성을 다시 분석해 주세요.'}</p></div>{symptoms.length > 0 && <div className="symptom-section"><h3>감지된 증상 <span className="count">{symptoms.length}</span></h3><div className="symptom-list">{symptoms.map((symptom) => <div className="symptom-item" key={symptom.code}><span className="symptom-tag">{symptom.label}</span>{symptom.evidence && <span className="symptom-evidence">“{symptom.evidence}”</span>}</div>)}</div></div>}</>}
+      {analysis ?
+        <div className="summary-section"><div className="subheading"><h3><Icon name="sparkles" size={17} />상황 요약</h3><span className={`badge urgency-${urgencyClass}`}><span className="status-dot" />긴급도 - {urgency}</span></div><p className="summary-text">{analysis.summary}</p><p className="urgency-reason">{analysis.urgency.reason}</p></div>
+        : <div className="analysis-pending"><Icon name={streamState.analysisError ? 'info' : 'sparkles'} size={19} /><p>{!data.transcript?.text ? '음성이 인식되면 증상과 상황을 분석합니다.' : streamState.analysisError ? '상황 분석을 사용할 수 없어요.' : busy ? '전사된 내용을 바탕으로 상황을 분석하고 있어요.' : '상황 분석 결과가 없어요.'}</p></div>}
+      <div className="symptom-section">
+        <h3>감지된 증상 <span className="count">{symptoms.length}</span></h3>
+        {symptoms.length ? <div className="symptom-list">{symptoms.map((symptom) => <div className="symptom-item" key={symptom.code}><span className="symptom-tag">{symptom.label}</span>{symptom.evidence && <span className="symptom-evidence">“{symptom.evidence}”</span>}</div>)}</div> : <p className="muted small">{symptomStatus}</p>}
+      </div>
+      {questions.length > 0 && <div className="questions-section">
+        <h3><Icon name="help" size={17} />{local ? '기본 확인 질문' : '이어서 확인해 보세요'}</h3>
+        <ol className="question-list">{questions.map((question, index) => <li key={question.question}><span className="question-number">{index + 1}</span><div><p>{question.question}</p><span>{question.purpose}</span></div></li>)}</ol>
+        <p className="manual-note">{local ? '상황 분석을 기다리는 동안 사용할 수 있는 공통 질문입니다.' : '담당자 검토용 질문이며 공식 응급 매뉴얼에 근거한 질문은 아닙니다.'}</p>
+      </div>}
       {data.audio_signals?.available && <div className="audio-signals"><h3>음성 상태</h3><div className="signal-tags">{data.audio_signals.speaking_rate_per_minute != null && <span>말속도 {Math.round(data.audio_signals.speaking_rate_per_minute)} /분</span>}{data.audio_signals.crying_detected != null && <span>울음 {data.audio_signals.crying_detected ? '감지' : '미감지'}</span>}{data.audio_signals.breathing_distress_detected != null && <span>호흡 곤란 {data.audio_signals.breathing_distress_detected ? '감지' : '미감지'}</span>}</div></div>}
       {data.warnings?.length > 0 && <details className="result-details"><summary><Icon name="info" size={15} />분석 시 참고할 점 <span>{data.warnings.length}</span></summary><ul>{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details>}
     </div>}

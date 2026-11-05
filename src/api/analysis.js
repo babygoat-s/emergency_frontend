@@ -8,7 +8,9 @@ export const DEFAULT_CONFIG = {
   max_upload_mb: 50,
   max_audio_seconds: 600,
   languages: ['ko', 'en', 'ja', 'auto'],
-  realtime_window_seconds: 3,
+  realtime_window_seconds: 6,
+  koelectra_symptom_labels: [],
+  example_preview: null,
 }
 
 export class ApiError extends Error {

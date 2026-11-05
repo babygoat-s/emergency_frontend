@@ -3,7 +3,7 @@ import { analyzeFile, DEFAULT_CONFIG, getConfig, getExample, getHealth } from '.
 import { startRealtime } from './audio/realtime'
 import { EMPTY_STREAM, formatTime, mergeStreamEvent, validateFile } from './lib/results'
 import Icon from './components/Icon'
-import Results from './components/Results'
+import Results, { UrgencyScale } from './components/Results'
 import './App.css'
 
 const languageNames = { ko: '한국어', en: '영어', ja: '일본어', auto: '자동 감지' }
@@ -219,7 +219,7 @@ function App() {
       <main id="main-content" className="main-content">
         <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />VOICE TO INSIGHT</div><h1>목소리를 듣고, 상황을 이해해요<span>.</span></h1><p>119 신고 음성을 텍스트로 바꾸고, 중요한 증상을 확인하세요.</p></div><span className="page-heading-icon"><Icon name="pulse" size={37} /></span></div>
         {connection === 'offline' && <div className="connection-notice" role="status"><Icon name="info" size={18} /><p>분석 서버와 연결되지 않았어요. 백엔드를 실행한 뒤 다시 연결해 주세요.</p><button onClick={refreshConnection}>다시 연결<Icon name="refresh" size={14} /></button></div>}
-        {connection === 'online' && geminiReady === false && <div className="connection-notice" role="status"><Icon name="info" size={18} /><p>실제 상황 분석은 모델 설정이 필요해요. 먼저 준비된 예시 결과를 확인해 보세요.</p></div>}
+        {connection === 'online' && geminiReady === false && <div className="connection-notice" role="status"><Icon name="info" size={18} /><p>상황 요약과 맞춤 질문에는 Gemini 설정이 필요해요. 실시간 전사와 기본 확인 질문은 사용할 수 있어요.</p></div>}
         <div className="workspace-grid"><div className="analysis-column">
           <section className="card input-card" aria-labelledby="input-title">
             <div className="card-heading"><div className="section-title"><span className="step-number">01</span><h2 id="input-title">분석할 음성을 준비해 주세요</h2></div><span className="input-heading-icon"><Icon name="headphones" size={19} /></span></div>
@@ -231,16 +231,31 @@ function App() {
               </div>
               {durationExceeded && <p className="validation-note" role="alert"><Icon name="alert" size={15} />최대 {Math.floor(config.max_audio_seconds / 60)}분까지 분석할 수 있어요. 더 짧은 파일을 선택해 주세요.</p>}
               <div className="input-bottom"><span className="input-hint"><Icon name="clock" size={15} />최대 {Math.floor(config.max_audio_seconds / 60)}분의 음성</span>{operation === 'file' ? <button className="button secondary-button" onClick={cancelOperation}>분석 취소<Icon name="close" size={16} /></button> : <button className="button primary-button" disabled={!file || busy || durationExceeded} onClick={() => runAnalysis('file')}><Icon name="sparkles" size={17} />음성 분석하기<Icon name="arrow" size={17} /></button>}</div>
-            </> : <><div className={`record-zone ${recording ? 'recording' : ''}`}><span className={`record-mic ${recording ? 'recording' : ''}`}><Icon name="mic" size={30} /></span><h3>{recording ? '편안하게 말씀해 주세요' : operation === 'connecting' ? '마이크를 준비하고 있어요' : operation === 'finishing' ? '마지막 내용을 분석하고 있어요' : '마이크로 바로 시작하세요'}</h3><p>{recording ? '녹음하는 동안 전사와 분석 결과가 아래에 표시돼요.' : '마이크 접근을 허용한 뒤 신고 음성을 녹음해 주세요.'}</p><Waveform level={level} active={recording} /><div className="record-timer"><span className={recording ? 'record-dot' : 'timer-dot'} />{formatTime(seconds)}<span>/ {formatTime(config.max_audio_seconds)}</span></div></div><div className="input-bottom"><span className="input-hint"><Icon name="pulse" size={15} />약 {config.realtime_window_seconds}초 단위로 음성 전송</span>{recording ? <button className="button stop-button" onClick={stopRecording}><Icon name="stop" size={16} />녹음 종료</button> : ['connecting', 'finishing'].includes(operation) ? <button className="button secondary-button" onClick={cancelOperation}>취소<Icon name="close" size={16} /></button> : <button className="button primary-button" onClick={beginRecording} disabled={busy}><Icon name="mic" size={17} />녹음 시작하기</button>}</div></>}
+            </> : <><div className={`record-zone ${recording ? 'recording' : ''}`}><span className={`record-mic ${recording ? 'recording' : ''}`}><Icon name="mic" size={30} /></span><h3>{recording ? '편안하게 말씀해 주세요' : operation === 'connecting' ? '마이크를 준비하고 있어요' : operation === 'finishing' ? '마지막 내용을 분석하고 있어요' : '마이크로 바로 시작하세요'}</h3><p>{recording ? '녹음하는 동안 전사와 분석 결과가 아래에 표시돼요.' : '마이크 접근을 허용한 뒤 신고 음성을 녹음해 주세요.'}</p><Waveform level={level} active={recording} /><div className="record-timer"><span className={recording ? 'record-dot' : 'timer-dot'} />{formatTime(seconds)}<span>/ {formatTime(config.max_audio_seconds)}</span></div></div><div className="input-bottom"><span className="input-hint"><Icon name="pulse" size={15} />최대 {config.realtime_window_seconds}초씩 전사</span>{recording ? <button className="button stop-button" onClick={stopRecording}><Icon name="stop" size={16} />녹음 종료</button> : ['connecting', 'finishing'].includes(operation) ? <button className="button secondary-button" onClick={cancelOperation}>취소<Icon name="close" size={16} /></button> : <button className="button primary-button" onClick={beginRecording} disabled={busy}><Icon name="mic" size={17} />녹음 시작하기</button>}</div></>}
             {busy && <div className="operation-status" role="status"><span className={recording ? 'record-dot' : 'loading-spinner'} /><p>{progressText}<span>{operation === 'file' ? '음성 길이와 모델 상태에 따라 시간이 걸릴 수 있어요.' : operation === 'recording' ? '분석 결과의 도착 시간은 서버 상태에 따라 달라져요.' : operation === 'connecting' ? '브라우저에서 마이크 권한을 허용해 주세요.' : '잠시만 기다려 주세요.'}</span></p>{operation === 'example' && <button className="text-button" onClick={cancelOperation}>취소</button>}</div>}
             {error && <div className="error-message" role="alert"><Icon name="alert" size={18} /><p>{error}</p><button className="icon-button" onClick={() => setError(null)} aria-label="오류 메시지 닫기"><Icon name="close" size={16} /></button></div>}
           </section>
-          <Results result={result} streamState={streamState} operation={operation} />
+          <Results result={result} streamState={streamState} operation={operation} symptomCount={config.koelectra_symptom_labels.length} />
           <p className="session-note"><Icon name="shield" size={14} />분석 기록은 저장되지 않아요. 현재 결과는 페이지를 새로고침하면 사라집니다.</p>
         </div>
         <aside className="support-column" aria-label="기능 안내와 분석 예시">
           <section className="card features-card"><div className="aside-heading"><h2>이렇게 도와드려요</h2><span className="small-caps">HOW IT WORKS</span></div><div className="feature-list">{features.map((feature, index) => <div className="feature-item" key={feature.title}><span className={`feature-icon feature-icon-${index}`}><Icon name={feature.icon} size={24} /></span><div><h3>{feature.title}</h3><p>{feature.text}</p></div></div>)}</div><div className="feature-footnote"><span className="status-dot" />업로드부터 결과 확인까지, 한 화면에서</div></section>
-          <section className="card example-card"><div className="example-card-heading"><span className="badge example-label"><Icon name="sparkles" size={12} />미리 체험하기</span><Icon name="sparkles" size={22} /></div><h2>어떤 결과가 나올까요?</h2><p className="example-description">음성 파일이 없어도 괜찮아요.<br />준비된 예시로 분석 화면을 살펴보세요.</p><div className="example-quote"><span className="quote-mark">“</span><p>아버지가 갑자기 쓰러지셨어요.<br />숨을 안 쉬는 것 같아요.</p><span className="quote-caption"><span />신고 내용 예시</span></div><div className="example-tags"><span>쓰러짐</span><span>호흡 없음 의심</span></div><button className="button example-button" disabled={busy} onClick={() => runAnalysis('example')}>{operation === 'example' ? <><span className="loading-spinner" />예시 불러오는 중</> : <>예시 결과 살펴보기<Icon name="arrow" size={17} /></>}</button><span className="example-disclaimer">실제 모델을 호출하지 않는 고정 예시예요.</span></section>
+          {config.koelectra_symptom_labels.length > 0 && <section className="card features-card symptom-catalog" aria-labelledby="symptom-catalog-title">
+            <div className="aside-heading"><h2 id="symptom-catalog-title">분류할 수 있는 증상</h2><span className="small-caps">{config.koelectra_symptom_labels.length}종</span></div>
+            <ul>{config.koelectra_symptom_labels.map((label) => <li key={label}>{label}</li>)}</ul>
+            <UrgencyScale />
+          </section>}
+          <section className="card example-card">
+            <div className="example-card-heading"><span className="badge example-label"><Icon name="sparkles" size={12} />미리 체험하기</span><Icon name="sparkles" size={22} /></div>
+            <h2>어떤 결과가 나올까요?</h2>
+            <p className="example-description">음성 파일이 없어도 괜찮아요.<br />준비된 예시로 분석 화면을 살펴보세요.</p>
+            {config.example_preview && <>
+              <div className="example-quote"><span className="quote-mark">“</span><p>{config.example_preview.quote}</p><span className="quote-caption"><span />신고 내용 예시</span></div>
+              <div className="example-tags">{config.example_preview.symptom_labels.map((label) => <span key={label}>{label}</span>)}</div>
+            </>}
+            <button className="button example-button" disabled={busy} onClick={() => runAnalysis('example')}>{operation === 'example' ? <><span className="loading-spinner" />예시 불러오는 중</> : <>예시 결과 살펴보기<Icon name="arrow" size={17} /></>}</button>
+            <span className="example-disclaimer">가상 신고를 바탕으로 준비한 고정 예시예요.</span>
+          </section>
           <div className="help-card"><span className="help-card-icon"><Icon name="help" size={22} /></span><div><strong>처음 사용하시나요?</strong><button onClick={openGuide}>간단한 사용 안내 보기<Icon name="arrow" size={14} /></button></div></div>
         </aside></div>
         <footer className="page-footer"><Icon name="info" size={15} /><p>AI 분석은 신고 접수를 돕는 참고 정보입니다. 최종 판단은 담당자가 확인해 주세요.</p><span>119 VOICE ASSISTANT</span></footer>

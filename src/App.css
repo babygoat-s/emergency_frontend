@@ -121,9 +121,13 @@
 .example-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 20px; }
 .example-tags > span { font-size: 10px; color: #989ec7; padding: 4px 7px; background: #e9ecfc; border-radius: 4px; }
 .example-button { width: 100%; border: 1px solid #cdd2f6; color: #7379d3; background: #fff9; padding: 10px; }
+.example-description + .example-button { margin-top: 16px; }
 .example-button:hover:not(:disabled) { border-color: #9da5ee; background: #fff; }
 .example-button svg { margin-left: auto; }
 .example-disclaimer { display: block; text-align: center; margin-top: 10px; font-size: 10px; color: #a3abc4; }
+.features-card.symptom-catalog { padding-bottom: 20px; }
+.symptom-catalog ul { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 12px 0 0; }
+.symptom-catalog li { background: #eeeffe; color: #4a5278; font-size: 12px; padding: 5px 9px; border-radius: 5px; }
 .help-card { display: flex; gap: 12px; padding: 3px 7px; align-items: center; }
 .help-card-icon { color: #b1b8cc; width: 34px; display: grid; place-items: center; }
 .help-card strong { color: #7a869e; font-size: 12px; font-weight: 500; }
@@ -175,11 +179,16 @@
 .summary-section { padding: 22px 0; border-bottom: 1px solid #f0f2f7; }
 .summary-text { color: #616e8c; font-size: 14px; line-height: 2; word-break: keep-all; }
 .urgency-reason { color: #7a859b; font-size: 12px; line-height: 1.9; margin-top: 6px; }
-.badge.urgency-critical { background: #fff0f1; color: #b35468; }
-.badge.urgency-high { background: #fff5ec; color: #a6764d; }
-.badge.urgency-moderate { background: #fff9e8; color: #8e7c43; }
-.badge.urgency-low { background: #eefaf5; color: #3e8b74; }
-.badge.urgency-unknown { background: #f1f3f8; color: #9ba4ba; }
+.urgency-scale { border-top: 1px solid #e9edf4; margin-top: 16px; padding-top: 14px; }
+.urgency-scale h3 { color: #5d6984; font-size: 12px; }
+.urgency-scale ol { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 8px 0; }
+.urgency-scale p { color: #616e86; font-size: 12px; line-height: 1.6; }
+.badge.urgency-critical { background: #fff0f1; color: #9b3049; }
+.badge.urgency-high { background: #fff5ec; color: #835322; }
+.badge.urgency-moderate { background: #fff9e8; color: #6e591b; }
+.badge.urgency-low { background: #eefaf5; color: #23664f; }
+.badge.urgency-minimal { background: #edf2fa; color: #526884; }
+.badge.urgency-unknown { background: #f1f3f8; color: #59647c; }
 .symptom-section { padding: 20px 0; border-bottom: 1px solid #f0f2f7; }
 .count { font-size: 11px; color: #9299d1; padding: 2px 5px; background: #f0f1fb; border-radius: 4px; }
 .symptom-list { display: flex; flex-direction: column; gap: 10px; margin-top: 13px; }

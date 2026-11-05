@@ -6,10 +6,12 @@ export const EMPTY_STREAM = {
   analysisSequence: 0,
   settledSequence: 0,
   symptomSequence: 0,
+  localQuestionSequence: 0,
+  symptomError: null,
   analysisError: null,
 }
 
-// Audio and Gemini events can arrive out of order. Keep their cursors independent.
+// Audio, symptom and Gemini events can arrive out of order.
 export function mergeStreamEvent(previous, event) {
   if (event.type !== 'update' || !event.data) return previous
   const { sequence, stage, data } = event
@@ -18,9 +20,17 @@ export function mergeStreamEvent(previous, event) {
     next.transcriptSequence = sequence
     for (const key of ['transcript', 'speakers', 'audio_signals', 'warnings', 'is_demo']) next.data[key] = data[key]
   }
-  if (data.symptoms?.length && sequence >= previous.symptomSequence) {
+  if ((stage === 'symptoms' || data.symptom_provider || data.symptoms?.length || data.analysis) && sequence >= previous.symptomSequence) {
     next.data.symptoms = data.symptoms
+    next.data.symptom_provider = data.symptom_provider
     next.symptomSequence = sequence
+    if (stage === 'symptoms' || data.symptom_provider) {
+      next.symptomError = stage === 'symptoms' && event.error ? publicErrorMessage(event.error.code) : null
+    }
+  }
+  if (data.local_questions?.length && sequence >= previous.localQuestionSequence) {
+    next.data.local_questions = data.local_questions
+    next.localQuestionSequence = sequence
   }
   if (stage === 'analysis' && sequence >= previous.settledSequence) {
     next.settledSequence = sequence
@@ -31,14 +41,17 @@ export function mergeStreamEvent(previous, event) {
     if (data.analysis) {
       next.data.analysis = data.analysis
       next.analysisSequence = sequence
-      if (sequence >= next.symptomSequence) {
-        next.data.symptoms = data.symptoms
-        next.symptomSequence = sequence
-      }
     }
   }
   if (sequence >= previous.transcriptSequence && (stage === 'analysis' || sequence > previous.settledSequence)) next.data.status = data.status
   return next
+}
+
+export function selectQuestions(result, streamState) {
+  const data = result || streamState.data
+  const local = !result && Boolean(data?.local_questions?.length) &&
+    (!data.analysis || streamState.localQuestionSequence > streamState.analysisSequence)
+  return { local, questions: (local ? data.local_questions : data?.analysis?.recommended_questions) || [] }
 }
 
 export function formatTime(seconds = 0) {
