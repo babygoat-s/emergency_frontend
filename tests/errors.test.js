@@ -1,10 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getExample } from '../src/api/analysis.js'
+import { analyzeText, getExample } from '../src/api/analysis.js'
 import { EMPTY_STREAM, mergeStreamEvent } from '../src/lib/results.js'
 import { publicErrorMessage } from '../src/lib/error-messages.js'
 
 const detail = 'Gemini HTTP 400 INVALID_ARGUMENT API_KEY_INVALID .env secret-test'
+
+test('local text analysis requests no LLM and recognizes completed manual retrieval', async (t) => {
+  const original = globalThis.fetch
+  t.after(() => { globalThis.fetch = original })
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(JSON.parse(options.body).use_llm, false)
+    return new Response(JSON.stringify({ status: 'ready', llm_status: 'disabled', questions: [] }))
+  }
+  const result = await analyzeText('신고자: 가상 상담입니다.')
+  assert.equal(result.status, 'completed')
+})
 
 test('REST errors retain machine codes but never display upstream diagnostic text', async (t) => {
   const original = globalThis.fetch

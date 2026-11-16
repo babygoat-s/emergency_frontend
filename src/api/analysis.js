@@ -4,11 +4,18 @@ const configuredBase = (import.meta.env?.VITE_API_BASE_URL || '').trim().replace
 
 export const API_BASE = configuredBase
 export const DEFAULT_CONFIG = {
+  llm_privacy_mode: 'unknown',
+  llm_external_enabled: false,
+  llm_local_configured: false,
+  llm_features_enabled: false,
   supported_audio_formats: ['wav', 'mp3', 'm4a', 'webm', 'ogg', 'mp4'],
   max_upload_mb: 50,
   max_audio_seconds: 600,
   languages: ['ko', 'en', 'ja', 'auto'],
-  realtime_window_seconds: 3,
+  realtime_window_seconds: 6,
+  koelectra_symptom_labels: [],
+  example_preview: null,
+  rag_enabled: false,
 }
 
 export class ApiError extends Error {
@@ -50,6 +57,20 @@ async function request(path, { signal, timeout = 15000, ...options } = {}) {
 export const getHealth = (signal) => request('/health', { signal, timeout: 6000 })
 export const getConfig = (signal) => request('/analysis/config', { signal, timeout: 6000 })
 export const getExample = (signal) => request('/analysis/example', { signal })
+
+export async function analyzeText(text, signal, useLlm = false) {
+  const conversation = text.split('\n').map((line) => line.trim()).filter(Boolean).map((line, index) => {
+    const prefix = line.match(/^(신고자|상담원|접수 담당자)\s*[:：]\s*/)
+    return { id: String(index), speaker: prefix ? (prefix[1] === '신고자' ? 'caller' : 'operator') : 'unknown', text: prefix ? line.slice(prefix[0].length) : line }
+  })
+  const rag = await request('/rag/recommend', { method: 'POST', signal, timeout: 45000,
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation, use_llm: useLlm }) })
+  const completed = rag.status !== 'index_unavailable' && (!useLlm || rag.llm_status === 'completed')
+  return { status: completed ? 'completed' : 'unavailable', rag,
+    transcript: { text, provider: 'text', segments: [] }, symptoms: [], analysis: null,
+    local_questions: rag.questions.map((q) => ({ question: q.question, purpose: q.reason })),
+    manual_grounded: rag.questions.length > 0, warnings: [] }
+}
 
 export function analyzeFile(file, language, signal) {
   const body = new FormData()
