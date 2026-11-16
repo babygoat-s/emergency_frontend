@@ -14,6 +14,7 @@ export const EMPTY_STREAM = {
   lastUrgency: null,
   lastManual: null,
   processingLagSeconds: 0,
+  revisionSequence: 0,
 }
 
 // Audio, symptom and Gemini events can arrive out of order.
@@ -21,6 +22,18 @@ export function mergeStreamEvent(previous, event) {
   if (event.type !== 'update' || !event.data) return previous
   const { sequence, stage, data } = event
   const next = { ...previous, data: { ...(previous.data || data) } }
+  if ((data.transcript?.revision || 0) > (previous.data?.transcript?.revision || 0)) {
+    next.revisionSequence = sequence
+    next.lastSummary = next.lastUrgency = next.lastManual = null
+    next.data.analysis = null
+    next.data.symptoms = []
+    next.data.symptom_provider = null
+    next.data.local_questions = []
+    next.data.rag = null
+    next.data.manual_grounded = false
+    next.analysisError = next.symptomError = null
+  }
+  if (sequence < (next.revisionSequence || 0)) return next
   // Audio and LLM have independent cursors: a newer audio window must not
   // discard an LLM summary that is newer than the last completed LLM work.
   if (data.rag?.summary_provider === 'llm' && data.rag.summary &&

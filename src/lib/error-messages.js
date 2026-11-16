@@ -1,4 +1,5 @@
 const messages = {
+  LLM_PRIVACY_BLOCKED: '외부 AI 전송이 차단되어 있어요. 로컬 AI 연결 상태를 확인해 주세요.',
   FILE_TOO_LARGE: '파일 용량이 너무 커요. 안내된 용량 이하의 파일을 선택해 주세요.',
   AUDIO_TOO_LONG: '음성 길이가 너무 길어요. 더 짧은 파일을 선택해 주세요.',
   UNSUPPORTED_AUDIO: '지원하지 않는 파일 형식이에요. 다른 음성 파일을 선택해 주세요.',

@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import Icon from './Icon'
 import ManualQuestions from './ManualQuestions'
 import { formatTime, selectQuestions, selectManualResult } from '../lib/results'
@@ -22,7 +23,7 @@ export function UrgencyScale() {
   )
 }
 
-export default function Results({ result, streamState, operation, symptomCount = 0 }) {
+export default function Results({ result, streamState, operation, symptomCount = 0, llmEnabled = true }) {
   const data = result || streamState.data
   const textOnly = data?.transcript?.provider === 'text' || operation === 'text'
   const busy = ['file', 'text', 'example', 'connecting', 'recording', 'finishing'].includes(operation)
@@ -50,6 +51,20 @@ export default function Results({ result, streamState, operation, symptomCount =
   )
   const symptoms = data?.symptoms || analysis?.symptoms || []
   const segments = data?.transcript?.segments || []
+  const transcriptBox = useRef(null)
+  const followTranscript = useRef(true)
+  const setTranscriptBox = useCallback((node) => {
+    transcriptBox.current = node
+    if (node) followTranscript.current = true
+  }, [])
+  const updateTranscriptScroll = (event) => {
+    const box = event.currentTarget
+    followTranscript.current = box.scrollHeight - box.clientHeight - box.scrollTop <= 4
+  }
+  useLayoutEffect(() => {
+    const box = transcriptBox.current
+    if (box && followTranscript.current) box.scrollTop = box.scrollHeight
+  }, [data?.transcript?.text, segments.length, busy])
   const { local, questions } = selectQuestions(result, streamState)
   let symptomStatus = '발화가 인식되면 증상을 분류합니다.'
   if (data?.transcript?.text)
@@ -65,14 +80,12 @@ export default function Results({ result, streamState, operation, symptomCount =
       data.is_demo ? '[고정 예시 결과]' : '',
       '\n[변환된 텍스트]',
       data.transcript.text,
-      '\n[상황 요약]',
-      summary || 'LLM 요약을 아직 생성하지 못했습니다.',
+      ...(llmEnabled ? ['\n[상황 요약]', summary || 'LLM 요약을 아직 생성하지 못했습니다.'] : []),
       '\n[감지된 증상]',
       ...(symptoms.length
         ? symptoms.map((item) => `- ${item.label}${item.evidence ? `: ${item.evidence}` : ''}`)
         : [symptomStatus]),
-      '\n[긴급도]',
-      `${urgency}${urgencyResult?.reason ? `: ${urgencyResult.reason}` : ''}`,
+      ...(llmEnabled ? ['\n[긴급도]', `${urgency}${urgencyResult?.reason ? `: ${urgencyResult.reason}` : ''}`] : []),
       local ? '\n[기본 확인 질문]' : '\n[확인 질문]',
       ...(!data.rag ? questions.map((item) => `- ${item.question} (${item.purpose})`) : []),
       ...(data.rag
@@ -192,8 +205,8 @@ export default function Results({ result, streamState, operation, symptomCount =
               {data?.transcript?.duration_seconds != null && formatTime(data.transcript.duration_seconds)}
             </span>
           </div>
-          {data?.transcript?.text ? (
-            <div className="transcript-box">
+          {data?.transcript?.text || segments.length ? (
+            <div className="transcript-box" ref={setTranscriptBox} onScroll={updateTranscriptScroll}>
               {segments.length ? (
                 segments.map((segment, index) => {
                   const speaker = data.transcript.diarization_available ? segment.speaker : 'unknown'
@@ -212,7 +225,10 @@ export default function Results({ result, streamState, operation, symptomCount =
                           </span>
                           <time className="segment-time">{formatTime(segment.start)}</time>
                         </div>
-                        <p>{segment.text}</p>
+                        <p>{segment.recognition_status === 'needs_review'
+                          ? (busy ? '발화 원음 확인 필요 — 녹음 종료 후 자동 재인식합니다.'
+                            : '발화를 확인하지 못했습니다. 원음을 듣고 직접 확인해 주세요.') : segment.text}</p>
+                        {segment.recognition_status === 'rechecked' && <span className="panel-meta">원음 재인식 결과</span>}
                       </div>
                     </article>
                   )
@@ -270,6 +286,7 @@ export default function Results({ result, streamState, operation, symptomCount =
           </div>
         </section>
         <div className="insights-column">
+          {llmEnabled && <>
           <section className="card summary-card" aria-labelledby="summary-title">
             <div className="panel-heading">
               <div className="section-title">
@@ -329,6 +346,7 @@ export default function Results({ result, streamState, operation, symptomCount =
               </p>
             </div>
           </section>
+          </>}
           {!textOnly && (
             <section className="card symptom-card" aria-labelledby="symptom-title">
               <div className="panel-heading">

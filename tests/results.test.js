@@ -9,6 +9,36 @@ const payload = (text, analysis = null, symptoms = []) => ({
 })
 const event = (sequence, stage, data, error) => ({ type: 'update', sequence, stage, data, error })
 
+test('an unresolved audio revision clears previously grounded manual results too', () => {
+  let state = mergeStreamEvent(EMPTY_STREAM, event(1, 'analysis', {
+    ...payload('이전 발화'), rag: { questions: [{ question: '이전 질문' }] }, manual_grounded: true,
+  }))
+  const revised = { ...payload(''), transcript: { text: '', segments: [], revision: 1 }, rag: null }
+  state = mergeStreamEvent(state, event(2, 'audio', revised))
+  assert.equal(state.data.rag, null)
+  assert.equal(state.data.manual_grounded, false)
+})
+
+test('audio revision discards old symptoms and rejects delayed results for the wrong transcript', () => {
+  let state = mergeStreamEvent(EMPTY_STREAM, event(1, 'analysis', payload('잘못된 네',
+    { summary: '이전 요약' }, [{ code: 'fever' }])))
+  const corrected = payload('팔이 마비됐어요')
+  corrected.transcript.revision = 2
+  corrected.rag = { questions: [{ question: '발음이 정확한가요?' }] }
+  state = mergeStreamEvent(state, event(3, 'audio', corrected))
+  assert.equal(state.data.analysis, null)
+  assert.deepEqual(state.data.symptoms, [])
+  assert.equal(state.revisionSequence, 3)
+  state = mergeStreamEvent(state, event(2, 'analysis', payload('잘못된 네',
+    { summary: '지연된 요약' }, [{ code: 'fever' }])))
+  assert.equal(state.data.transcript.text, '팔이 마비됐어요')
+  assert.equal(state.data.analysis, null)
+  assert.equal(state.data.rag.questions[0].question, '발음이 정확한가요?')
+  const symptoms = [{ code: 'general_weakness' }]
+  state = mergeStreamEvent(state, event(3, 'symptoms', { ...corrected, symptoms, symptom_provider: 'koelectra' }))
+  assert.deepEqual(state.data.symptoms, symptoms)
+})
+
 test('late RAG analysis cannot replace manual questions for newer speech', () => {
   const newest = { questions: [{ question: '새 질문' }], status: 'ready' }
   let state = mergeStreamEvent(EMPTY_STREAM, event(2, 'audio', { ...payload('새 발화'), rag: newest, manual_grounded: true }))

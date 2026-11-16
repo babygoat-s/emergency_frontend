@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { startRealtime } from '../src/audio/realtime.js'
 
-function setup(t, { permission, onSend } = {}) {
+function setup(t, { permission, onSend, displayPermission } = {}) {
   const state = { messages: [], errors: [], events: [], stoppedTracks: 0, closedContexts: 0 }
   class Socket {
     static OPEN = 1
@@ -38,6 +38,12 @@ function setup(t, { permission, onSend } = {}) {
     resume() { return Promise.resolve() }
     close() { this.state = 'closed'; state.closedContexts++; return Promise.resolve() }
     createMediaStreamSource() { return { connect() {}, disconnect() {} } }
+    decodeAudioData() { return Promise.resolve({ duration: 10 }) }
+    createBufferSource() {
+      const source = { connect() {}, disconnect() {}, start() { state.started = true }, stop() {} }
+      state.source = source
+      return source
+    }
   }
   class Worklet {
     constructor() {
@@ -53,7 +59,7 @@ function setup(t, { permission, onSend } = {}) {
   const microphone = { getTracks: () => [{ stop: () => { state.stoppedTracks++ } }] }
   const replacements = {
     window: { isSecureContext: true, location: { origin: 'http://localhost:5173' }, AudioContext: Context },
-    navigator: { mediaDevices: { getUserMedia: permission || (async () => microphone) } },
+    navigator: { mediaDevices: { getUserMedia: permission || (async () => microphone), getDisplayMedia: displayPermission } },
     WebSocket: Socket, AudioWorkletNode: Worklet,
   }
   for (const [name, value] of Object.entries(replacements)) {
@@ -119,4 +125,51 @@ test('fatal WebSocket errors never expose upstream diagnostic messages', async (
   assert.equal(state.errors.length, 1)
   assert.equal(state.errors[0].message, '음성 분석을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.')
   assert.equal(state.stoppedTracks, 1)
+})
+
+test('file input uses decoded digital audio and sends finish when it ends, without requesting a microphone', async (t) => {
+  let requested = false
+  const { state } = setup(t, { permission: async () => { requested = true; throw new Error('microphone') } })
+  let ended = false
+  await startRealtime({ language: 'ko', sourceType: 'file', file: new Blob(['test']),
+    onSourceEnded: () => { ended = true }, onEvent: event => state.events.push(event),
+    onError: error => state.errors.push(error), onLevel() {} })
+  assert.equal(state.started, true)
+  assert.equal(requested, false)
+  state.source.onended()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(ended, true)
+  assert.equal(state.events.at(-1).type, 'finished')
+  assert.equal(JSON.parse(state.messages.at(-1)).type, 'finish')
+  assert.equal(state.closedContexts, 1)
+})
+
+test('system capture sends audio only and releases audio and display tracks', async (t) => {
+  let constraints
+  let stopped = 0
+  const track = { stop() { stopped++ }, addEventListener() {} }
+  const { state } = setup(t, { displayPermission: async value => {
+    constraints = value
+    return { getAudioTracks: () => [track], getTracks: () => [track, track] }
+  } })
+  let preview
+  const session = await startRealtime({ language: 'ko', sourceType: 'system', onEvent() {},
+    onError() {}, onLevel() {}, onRecordingReady: blob => { preview = blob } })
+  await session.stop()
+  assert.equal(constraints.audio.echoCancellation, false)
+  assert.equal(stopped, 2)
+  assert.equal(preview.type, 'audio/wav')
+  assert.equal(preview.size, 144)
+  assert.equal(state.messages.filter(value => typeof value !== 'string').length, 1)
+})
+
+test('sharing without an audio track fails before opening a WebSocket', async (t) => {
+  let stopped = false
+  const { state } = setup(t, { displayPermission: async () => ({
+    getAudioTracks: () => [], getTracks: () => [{ stop() { stopped = true } }],
+  }) })
+  await assert.rejects(startRealtime({ sourceType: 'system', language: 'ko', onError() {},
+    onEvent() {}, onLevel() {} }), { code: 'MIC_UNAVAILABLE' })
+  assert.equal(stopped, true)
+  assert.equal(state.socket, undefined)
 })

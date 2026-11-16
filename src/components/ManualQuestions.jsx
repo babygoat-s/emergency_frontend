@@ -17,6 +17,10 @@ const fields = {
   seizure: '경련',
   chest_pain: '흉통',
   severe_bleeding: '심한 출혈',
+  speech_difficulty: '말·발음',
+  paralysis: '얼굴·팔다리 마비',
+  sensory_change: '감각 변화',
+  symptom_onset: '증상 시작 시점',
 }
 const values = {
   yes: '있음 / 예',
@@ -79,10 +83,10 @@ export default function ManualQuestions({ result }) {
                 <div>
                   <span className="manual-priority">
                     {priorities[question.priority]} · {question.related_symptom}
-                    {question.selection_origin !== 'llm_rewrite' && ' · 원문 질문'}
+                    {question.selection_origin !== 'llm_rewrite' &&
+                      (question.source_excerpt === question.question ? ' · 원문 질문' : ' · 매뉴얼 기반 질문')}
                   </span>
                   <p>{question.question}</p>
-                  <span>{question.reason}</span>
                   {questionSources(question).map((source) => (
                     <Citation key={`${source.document_id}:${source.pdf_page}`} source={source} />
                   ))}

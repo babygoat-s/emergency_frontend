@@ -33,15 +33,16 @@ function Waveform({ level, active }) {
 function App() {
   const [config, setConfig] = useState(DEFAULT_CONFIG)
   const [connection, setConnection] = useState('checking')
-  const [geminiReady, setGeminiReady] = useState(null)
   const [mode, setMode] = useState('upload')
   const [language, setLanguage] = useState('ko')
   const [conversation, setConversation] = useState('')
   const [file, setFile] = useState(null)
+  const [recordingSource, setRecordingSource] = useState('microphone')
   const [audioUrl, setAudioUrl] = useState('')
   const [duration, setDuration] = useState(null)
   const [dragging, setDragging] = useState(false)
   const [operation, setOperation] = useState('idle')
+  const [reviewingAudio, setReviewingAudio] = useState(false)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
   const [streamState, setStreamState] = useState(EMPTY_STREAM)
@@ -62,7 +63,6 @@ function App() {
   const updateConnection = useCallback(({ health, settings, signal }) => {
     if (signal.aborted) return
     setConnection(health.status === 'fulfilled' ? 'online' : 'offline')
-    setGeminiReady(health.status === 'fulfilled' ? health.value.gemini_configured : null)
     if (settings.status === 'fulfilled') setConfig({ ...DEFAULT_CONFIG, ...settings.value })
   }, [])
 
@@ -160,6 +160,10 @@ function App() {
 
   async function runAnalysis(kind) {
     if (operationRef.current) return
+    if (kind !== 'example' && !['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode)) {
+      setError('서버의 개인정보 보호 설정을 확인하지 못해 전송을 차단했습니다. 백엔드를 재시작해 주세요.')
+      return
+    }
     if (kind === 'file') {
       const message = validateFile(file, config)
       if (message || durationExceeded) {
@@ -177,7 +181,7 @@ function App() {
     try {
       let response
       if (kind === 'example') response = await getExample(controller.signal)
-      else if (kind === 'text') response = await analyzeText(conversation, controller.signal)
+      else if (kind === 'text') response = await analyzeText(conversation, controller.signal, config.llm_features_enabled)
       else response = await analyzeFile(file, language, controller.signal)
       if (controller.signal.aborted) return
       setResult(response)
@@ -195,12 +199,17 @@ function App() {
     }
   }
 
-  async function beginRecording() {
+  async function beginRecording(sourceType = recordingSource) {
+    if (!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode)) {
+      setError('서버의 개인정보 보호 설정을 확인하지 못해 전송을 차단했습니다. 백엔드를 재시작해 주세요.')
+      return
+    }
     if (operationRef.current) return
     const controller = new AbortController()
     const current = { controller, kind: 'realtime', session: null }
     operationRef.current = current
     setOperation('connecting')
+    setReviewingAudio(false)
     setError(null)
     setResult(null)
     setStreamState(EMPTY_STREAM)
@@ -208,12 +217,26 @@ function App() {
     try {
       const session = await startRealtime({
         language,
+        sourceType,
+        file: sourceType === 'file' ? file : null,
+        maxDurationSeconds: config.max_audio_seconds,
+        onRecordingReady: (blob) => {
+          if (operationRef.current !== current) return
+          setFile(new File([blob], '통화 녹음.wav', { type: 'audio/wav' }))
+          setAudioUrl('')
+          setDuration((blob.size - 44) / 32000)
+        },
+        onSourceEnded: () => {
+          if (operationRef.current === current) setOperation('finishing')
+        },
         signal: controller.signal,
         onLevel: (value) => {
           if (operationRef.current === current) setLevel(value)
         },
         onEvent: (event) => {
           if (operationRef.current !== current) return
+          if (event.type === 'reviewing') setReviewingAudio(true)
+          if (event.type === 'update') setReviewingAudio(false)
           if (event.type === 'update') setStreamState((previous) => mergeStreamEvent(previous, event))
           if (event.type === 'finished') {
             operationRef.current = null
@@ -256,9 +279,9 @@ function App() {
     text: '매뉴얼에서 다음 질문을 찾고 있어요',
     file: '음성 파일을 분석하고 있어요',
     example: '예시를 불러오고 있어요',
-    connecting: '마이크와 서버를 연결하고 있어요',
+    connecting: '음성 입력과 서버를 연결하고 있어요',
     recording: '실시간으로 음성을 분석하고 있어요',
-    finishing: '마지막 음성의 분석을 마무리하고 있어요',
+    finishing: reviewingAudio ? '반복 응답 구간의 원음을 다시 인식하고 있어요' : '마지막 음성의 분석을 마무리하고 있어요',
   }[operation]
 
   return (
@@ -380,14 +403,6 @@ function App() {
                   다시 연결
                   <Icon name="refresh" size={14} />
                 </button>
-              </div>
-            )}
-            {connection === 'online' && geminiReady === false && !config.rag_enabled && (
-              <div className="connection-notice" role="status">
-                <Icon name="info" />
-                <p>
-                  상황 분석에는 Gemini 설정이 필요합니다. 실시간 전사와 기본 확인 질문을 사용할 수 있습니다.
-                </p>
               </div>
             )}
             <section className="card input-card" aria-labelledby="input-title">
@@ -619,15 +634,19 @@ function App() {
                         {recording
                           ? '신고 통화 녹음 중'
                           : operation === 'connecting'
-                            ? '마이크 연결 중'
+                            ? '음성 입력 연결 중'
                             : operation === 'finishing'
                               ? '마지막 발화 처리 중'
-                              : '실시간 통화 녹음'}
+                              : '실시간 통화 분석'}
                       </h3>
                       <p>
                         {recording
                           ? '발화가 인식되면 전사와 분석 결과가 순차적으로 표시됩니다.'
-                          : '마이크를 연결하고 녹음을 시작해 주세요.'}
+                          : recordingSource === 'file'
+                            ? '선택한 파일을 마이크 재녹음 없이 직접 분석합니다.'
+                            : recordingSource === 'system'
+                              ? '선택한 PC 소리만 입력합니다. 오디오 공유를 선택하세요. 화면 영상은 전송하지 않습니다.'
+                              : '현장 대화는 마이크로, PC 통화는 통화 오디오 또는 파일 직접 입력으로 분석해 주세요.'}
                       </p>
                     </div>
                     <Waveform level={level} active={recording} />
@@ -640,7 +659,12 @@ function App() {
                   <div className="input-bottom">
                     <span className="input-hint">
                       <Icon name="radio" size={14} />
-                      최대 {config.realtime_window_seconds}초 단위로 전사
+                      <select aria-label="실시간 음성 입력" value={recordingSource}
+                        disabled={busy} onChange={(event) => setRecordingSource(event.target.value)}>
+                        <option value="microphone">마이크</option>
+                        <option value="system">PC·통화 오디오</option>
+                        <option value="file" disabled={!file}>선택한 파일 직접 입력</option>
+                      </select>
                     </span>
                     {recording ? (
                       <button className="button stop-button" onClick={stopRecording}>
@@ -653,14 +677,24 @@ function App() {
                         <Icon name="close" size={15} />
                       </button>
                     ) : (
-                      <button className="button primary-button" onClick={beginRecording} disabled={busy}>
+                      <button className="button primary-button" onClick={() => beginRecording()}
+                        disabled={busy || (recordingSource === 'file' && (!file || durationExceeded))}>
                         <Icon name="mic" size={15} />
-                        녹음 시작
+                        실시간 분석 시작
                       </button>
                     )}
                   </div>
+                  {audioUrl && !busy && <AudioPlayer key={audioUrl} src={audioUrl} onDuration={setDuration} />}
                 </>
               )}
+              <div className="privacy-status" role="note">
+                <Icon name="shield" size={14} />
+                {!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode)
+                  ? '개인정보 보호 설정을 확인한 뒤 분석할 수 있습니다.'
+                  : config.llm_external_enabled
+                    ? '식별정보 가림 적용 · 외부 AI 사용'
+                    : `외부 AI 전송 차단 · 서버 내부에서 분석${config.llm_features_enabled ? '' : ' · 요약·긴급도 AI 보류'}`}
+              </div>
               {busy && (
                 <div className="operation-status" role="status">
                   <Icon
@@ -704,6 +738,7 @@ function App() {
               streamState={streamState}
               operation={operation}
               symptomCount={config.koelectra_symptom_labels.length}
+              llmEnabled={config.llm_features_enabled}
             />
             <aside className="support-column" aria-label="기능 안내와 분석 예시">
               <section className="card features-card">
@@ -751,7 +786,7 @@ function App() {
                 ) : (
                   <p className="muted small">서버 연결 후 분류 대상을 표시합니다.</p>
                 )}
-                <UrgencyScale />
+                {config.llm_features_enabled && <UrgencyScale />}
               </section>
               <section className="card example-card">
                 <div className="aside-heading">
@@ -853,7 +888,7 @@ function App() {
             <div>
               <h3>핵심 정보를 확인하세요</h3>
               <p>
-                변환된 텍스트, 상황 요약, 증상과 확인 질문을 살펴보세요. 결과의 다운로드 버튼으로 텍스트를
+                변환된 텍스트, 증상과 매뉴얼 질문을 살펴보세요. 결과의 다운로드 버튼으로 텍스트를
                 보관할 수 있어요.
               </p>
             </div>

@@ -21,6 +21,21 @@ const source = {
   question_id: 'PRIVATE_QUESTION_ID', original_question_id: '99',
 }
 
+test('deferred AI hides summary and urgency while preserving symptoms and grounded questions', () => {
+  const html = renderToStaticMarkup(createElement(Results, {
+    llmEnabled: false, operation: 'idle', streamState: EMPTY_STREAM,
+    result: { status: 'completed', transcript: { text: '팔이 마비됐어요', provider: 'local' },
+      symptoms: [{ code: 'general_weakness', label: '전신쇠약', score: 0.6 }],
+      rag: { questions: [{ question: '환자분의 얼굴이나 팔·다리에 마비가 있나요?', source,
+        field: 'paralysis', priority: 1, related_symptom: '뇌졸중', supporting_sources: [] }],
+      state: { fields: {} }, safety_alerts: [], classification_references: [], instruction_references: [] },
+      warnings: [] },
+  }))
+  assert.doesNotMatch(html, /상담 요약|긴급도 -|요약 대기/)
+  assert.match(html, /전신쇠약/)
+  assert.match(html, /얼굴이나 팔·다리에 마비/)
+})
+
 test('source labels use SOP printed pages and manual physical PDF pages', () => {
   assert.equal(formatManualSource(source), '119구급상황관리센터 상담 매뉴얼 · PDF 13쪽')
   assert.equal(formatManualSource({ ...source, document_id: 'sop501', pdf_page: 2, printed_page: '128' }),
@@ -53,6 +68,7 @@ test('text RAG results show summary without clinical analysis and no PDF links o
   assert.match(html, /상담 요약/)
   assert.match(html, /LLM 요약/)
   assert.match(html, /환자가 두통과 구토를 호소합니다./)
+  assert.doesNotMatch(html, /현재 의식 상태가 확인되지 않았습니다./)
   assert.match(html, /긴급도 - 상/)
   assert.match(html, /LLM 검토 제안/)
   assert.match(html, /119구급상황관리센터 상담 매뉴얼 · PDF 13쪽/)
