@@ -42,7 +42,7 @@ export default function AuthenticatedApp() {
     <main className="signin-page">
       <section className="signin-panel" aria-labelledby="signin-title">
         <h1 id="signin-title">119 신고 분석</h1>
-        <p>허용된 Google 계정으로 로그인하세요.</p>
+        <p>Google 계정으로 로그인하세요.</p>
         <GoogleSignIn clientId={clientId} onCredential={signIn} />
         {checking && <p role="status">백엔드에서 접근 권한을 확인하고 있어요.</p>}
         {error && <p role="alert">{error}</p>}
