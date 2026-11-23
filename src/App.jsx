@@ -30,7 +30,7 @@ function Waveform({ level, active }) {
   )
 }
 
-function App() {
+function App({ onSignOut } = {}) {
   const [config, setConfig] = useState(DEFAULT_CONFIG)
   const [connection, setConnection] = useState('checking')
   const [mode, setMode] = useState('upload')
@@ -372,6 +372,7 @@ function App() {
               >
                 <Icon name="refresh" size={14} className={connection === 'checking' ? 'spin' : ''} />
               </button>
+              {onSignOut && <button className="text-button" onClick={onSignOut}>로그아웃</button>}
             </div>
           </header>
           <main id="main-content" className="main-content">
