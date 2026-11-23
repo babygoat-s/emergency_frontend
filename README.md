@@ -75,7 +75,8 @@ API_PROXY_TARGET=http://127.0.0.1:8000
 ```
 
 - 개발과 `npm run preview`는 Vite 프록시를 사용합니다.
-- `npm run build`의 정적 결과물에는 프록시가 포함되지 않습니다. 운영 서버에 `/api` HTTP·WebSocket 프록시를 구성하거나 `VITE_API_BASE_URL`을 설정하고 다시 빌드하세요.
+- Vercel 프런트엔드 프로젝트에 `BE_API_BASE_URL`을 설정하고 다시 배포하면 HTTP와 WebSocket이 해당 HTTPS origin을 사용합니다. Cloud Run에 직접 연결할 때는 백엔드의 Google 인증을 켜고 동일한 웹 클라이언트 ID를 `GOOGLE_CLIENT_ID`에 지정하세요. 빌드 결과에 포함되는 값에는 자격 증명을 넣지 마세요. 기존 `VITE_GOOGLE_OAUTH_CLIENT_ID`와 `VITE_API_BASE_URL`이 함께 설정돼 있으면 각 설정에서 우선합니다.
+- 정적 배포에서 두 환경변수를 비워 두면 같은 origin의 `/api`를 사용합니다. 이 경우 운영 서버가 HTTP와 WebSocket을 중계해야 합니다. 로컬 Vite는 `API_PROXY_TARGET`, `BE_API_BASE_URL`, `http://127.0.0.1:8000` 순으로 프록시 대상을 선택합니다.
 - 다른 origin에 직접 연결하면 백엔드 `CORS_ORIGINS`에 프런트엔드 origin을 허용해야 합니다. WebSocket도 같은 정책을 따릅니다.
 - 마이크는 localhost 또는 HTTPS에서 사용합니다. 모바일 기기 접속에는 HTTPS가 필요합니다.
 - HTTPS 프런트엔드에서는 HTTPS/WSS 백엔드를 사용하세요.

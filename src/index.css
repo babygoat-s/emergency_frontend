@@ -43,6 +43,28 @@ body {
   margin: 0;
   min-width: 320px;
 }
+.signin-page {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 20px;
+}
+.signin-panel {
+  width: min(100%, 380px);
+  padding: 28px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.signin-panel h1 {
+  margin: 0 0 12px;
+}
+.signin-panel p {
+  color: var(--muted);
+}
+.signin-panel [role='alert'] {
+  color: var(--danger);
+}
 button,
 input,
 textarea,

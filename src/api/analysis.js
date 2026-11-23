@@ -1,6 +1,9 @@
 import { publicErrorMessage } from '../lib/error-messages.js'
+import { getAuthToken } from './session.js'
 
-const configuredBase = (import.meta.env?.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
+const configuredBase = (
+  import.meta.env?.VITE_API_BASE_URL?.trim() || import.meta.env?.BE_API_BASE_URL || ''
+).replace(/\/+$/, '')
 
 export const API_BASE = configuredBase
 export const DEFAULT_CONFIG = {
@@ -26,7 +29,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { signal, timeout = 15000, ...options } = {}) {
+async function request(path, {
+  signal, timeout = 15000, authToken = getAuthToken(), headers, ...options
+} = {}) {
+  if (authToken) {
+    headers = new Headers(headers)
+    headers.set('Authorization', `Bearer ${authToken}`)
+  }
   const controller = new AbortController()
   const abort = () => controller.abort()
   if (signal?.aborted) controller.abort()
@@ -35,6 +44,7 @@ async function request(path, { signal, timeout = 15000, ...options } = {}) {
   try {
     const response = await fetch(`${API_BASE}/api/v1${path}`, {
       ...options,
+      ...(headers ? { headers } : {}),
       signal: controller.signal,
     })
     const body = await response.json().catch(() => null)
@@ -55,6 +65,9 @@ async function request(path, { signal, timeout = 15000, ...options } = {}) {
 }
 
 export const getHealth = (signal) => request('/health', { signal, timeout: 6000 })
+export const verifySession = (authToken, signal) => request('/auth/session', {
+  signal, authToken, timeout: 30000,
+})
 export const getConfig = (signal) => request('/analysis/config', { signal, timeout: 6000 })
 export const getExample = (signal) => request('/analysis/example', { signal })
 
