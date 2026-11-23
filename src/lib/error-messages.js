@@ -1,6 +1,6 @@
 const messages = {
   AUTH_REQUIRED: 'Google 계정으로 다시 로그인해 주세요.',
-  AUTH_FORBIDDEN: '이 계정은 접근 권한이 없어요. 허용된 Google 계정으로 로그인해 주세요.',
+  AUTH_FORBIDDEN: '이 Google 계정으로는 로그인할 수 없어요. 다른 계정으로 다시 시도해 주세요.',
   AUTH_UNAVAILABLE: '로그인 확인이 지연되고 있어요. 잠시 후 다시 시도해 주세요.',
   LLM_PRIVACY_BLOCKED: '외부 AI 전송이 차단되어 있어요. 로컬 AI 연결 상태를 확인해 주세요.',
   FILE_TOO_LARGE: '파일 용량이 너무 커요. 안내된 용량 이하의 파일을 선택해 주세요.',
