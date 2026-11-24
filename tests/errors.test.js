@@ -1,10 +1,29 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { analyzeText, getExample } from '../src/api/analysis.js'
+import { analyzeFile, analyzeText, getExample, verifySession } from '../src/api/analysis.js'
+import { setAuthToken } from '../src/api/session.js'
 import { EMPTY_STREAM, mergeStreamEvent } from '../src/lib/results.js'
 import { publicErrorMessage } from '../src/lib/error-messages.js'
 
 const detail = 'Gemini HTTP 400 INVALID_ARGUMENT API_KEY_INVALID .env secret-test'
+
+test('authenticated requests send the token as a header and keep the multipart body', async (t) => {
+  const original = globalThis.fetch
+  t.after(() => { globalThis.fetch = original; setAuthToken('') })
+  const requests = []
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options })
+    return new Response(JSON.stringify({ status: 'ok' }))
+  }
+  await verifySession('test.login.token')
+  setAuthToken('test.session.token')
+  await analyzeFile(new File(['synthetic'], 'test.wav'), 'ko')
+  assert.equal(requests[0].url, '/api/v1/auth/session')
+  assert.equal(requests[0].options.headers.get('Authorization'), 'Bearer test.login.token')
+  assert.equal(requests[1].options.headers.get('Authorization'), 'Bearer test.session.token')
+  assert.equal(requests[1].options.headers.has('Content-Type'), false)
+  assert.equal(requests[1].options.body.get('file').name, 'test.wav')
+})
 
 test('local text analysis requests no LLM and recognizes completed manual retrieval', async (t) => {
   const original = globalThis.fetch

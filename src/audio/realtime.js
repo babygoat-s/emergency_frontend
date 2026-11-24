@@ -1,4 +1,5 @@
 import { ApiError, realtimeUrl } from '../api/analysis.js'
+import { getAuthToken } from '../api/session.js'
 import { publicErrorMessage } from '../lib/error-messages.js'
 import { pcmWavBlob } from './wav.js'
 
@@ -82,7 +83,8 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
     await context.audioWorklet.addModule(new URL('./pcm-worklet.js', import.meta.url))
     assertActive()
 
-    socket = new WebSocket(realtimeUrl())
+    const token = getAuthToken()
+    socket = new WebSocket(realtimeUrl(), token ? ['emergency.v1', `auth.${token}`] : [])
     await new Promise((resolve, reject) => {
       openTimer = setTimeout(() => reject(new ApiError('실시간 서버 연결 시간이 초과됐어요.', 'WS_TIMEOUT')), 10000)
       socket.onopen = () => socket.send(JSON.stringify({ type: 'start', encoding: 'pcm_s16le', sample_rate: 16000, channels: 1, language }))

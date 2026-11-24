@@ -1,13 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { startRealtime } from '../src/audio/realtime.js'
+import { setAuthToken } from '../src/api/session.js'
 
 function setup(t, { permission, onSend, displayPermission } = {}) {
   const state = { messages: [], errors: [], events: [], stoppedTracks: 0, closedContexts: 0 }
   class Socket {
     static OPEN = 1
-    constructor(url) {
+    constructor(url, protocols) {
       this.url = url
+      this.protocols = protocols
       this.readyState = 1
       this.bufferedAmount = 0
       state.socket = this
@@ -83,6 +85,17 @@ test('realtime handshake, final PCM flush, finish event, and audio cleanup follo
   assert.equal(state.closedContexts, 1)
   assert.equal(state.socket.readyState, 3)
   assert.deepEqual(state.errors, [])
+})
+
+test('WebSocket authentication sends the token only in the handshake', async (t) => {
+  const { state } = setup(t)
+  setAuthToken('test.session.token')
+  t.after(() => setAuthToken(''))
+  const session = await startRealtime({ language: 'ko', onEvent() {}, onError() {}, onLevel() {} })
+  assert.deepEqual(state.socket.protocols, ['emergency.v1', 'auth.test.session.token'])
+  assert.equal(state.socket.url, 'ws://localhost:5173/api/v1/analysis/realtime')
+  assert.equal(state.messages[0].includes('test.session.token'), false)
+  await session.stop()
 })
 
 test('cancellation during a pending microphone request stops the microphone when permission resolves', async (t) => {
