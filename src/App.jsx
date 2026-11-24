@@ -6,6 +6,7 @@ import { RESEARCH_NOTICE } from './lib/manuals'
 import Icon from './components/Icon'
 import Results, { UrgencyScale } from './components/Results'
 import AudioPlayer from './components/AudioPlayer'
+import ThemeSwitch from './components/ThemeSwitch'
 import './App.css'
 
 const languageNames = { ko: '한국어', en: '영어', ja: '일본어', auto: '자동 감지' }
@@ -343,6 +344,7 @@ function App() {
               <br />
               담당자의 검토가 필요합니다.
             </p>
+            <ThemeSwitch />
             <span className="sidebar-version">119 상담 의사결정 지원</span>
           </div>
         </aside>
