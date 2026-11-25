@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
+import mockApi from './mock/mock-api.js'
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -24,7 +25,7 @@ export default defineConfig(({ command, mode }) => {
     },
   }
   return {
-    plugins: [react()],
+    plugins: mode === 'mock' ? [react(), mockApi()] : [react()],
     define: {
       'import.meta.env.BE_API_BASE_URL': JSON.stringify(backendOrigin),
       'import.meta.env.GOOGLE_CLIENT_ID': JSON.stringify(googleClientId),

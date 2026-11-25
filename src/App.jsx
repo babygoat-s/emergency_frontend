@@ -6,6 +6,7 @@ import { RESEARCH_NOTICE } from './lib/manuals'
 import Icon from './components/Icon'
 import Results, { UrgencyScale } from './components/Results'
 import AudioPlayer from './components/AudioPlayer'
+import ThemeSwitch from './components/ThemeSwitch'
 import './App.css'
 
 const languageNames = { ko: '한국어', en: '영어', ja: '일본어', auto: '자동 감지' }
@@ -339,6 +340,7 @@ function App({ onSignOut } = {}) {
               <br />
               담당자의 검토가 필요합니다.
             </p>
+            <ThemeSwitch />
             <span className="sidebar-version">119 상담 의사결정 지원</span>
           </div>
         </aside>
@@ -512,13 +514,6 @@ function App({ onSignOut } = {}) {
                             <Icon name="checkCircle" size={14} />
                             준비됨
                           </span>
-                          <button
-                            className="button secondary-button"
-                            disabled={busy}
-                            onClick={() => fileInput.current?.click()}
-                          >
-                            파일 변경
-                          </button>
                         </div>
                         {audioUrl && <AudioPlayer key={audioUrl} src={audioUrl} onDuration={setDuration} />}
                       </div>
@@ -531,17 +526,10 @@ function App({ onSignOut } = {}) {
                           <h3>신고 통화 파일을 여기에 놓으세요</h3>
                           <p>
                             {config.supported_audio_formats.map((item) => item.toUpperCase()).join(', ')} ·
-                            최대 {config.max_upload_mb} MB
+                            최대 {config.max_upload_mb} MB · 최대 {Math.floor(config.max_audio_seconds / 60)}분 ·
+                            분석 기록 자동 저장 없음
                           </p>
                         </div>
-                        <button
-                          className="button secondary-button"
-                          disabled={busy}
-                          onClick={() => fileInput.current?.click()}
-                        >
-                          파일 선택
-                          <Icon name="chevron" size={14} />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -554,8 +542,14 @@ function App({ onSignOut } = {}) {
                   )}
                   <div className="input-bottom">
                     <span className="input-hint">
-                      <Icon name="shield" size={14} />
-                      최대 {Math.floor(config.max_audio_seconds / 60)}분 · 분석 기록 자동 저장 없음
+                      <Icon name="upload" size={14} />
+                      <button
+                        className="button secondary-button file-pick-button"
+                        disabled={busy}
+                        onClick={() => fileInput.current?.click()}
+                      >
+                        {file ? '파일 변경' : '파일 선택'}
+                      </button>
                     </span>
                     {busy ? (
                       <button className="button secondary-button" onClick={cancelOperation}>
