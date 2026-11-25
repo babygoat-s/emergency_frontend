@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { analyzeFile, analyzeText, DEFAULT_CONFIG, getConfig, getExample, getHealth } from './api/analysis'
+import { analyzeFile, DEFAULT_CONFIG, getConfig, getExample, getHealth } from './api/analysis'
 import { startRealtime } from './audio/realtime'
 import { EMPTY_STREAM, formatTime, mergeStreamEvent, validateFile } from './lib/results'
 import { RESEARCH_NOTICE } from './lib/manuals'
@@ -35,7 +35,6 @@ function App({ onSignOut } = {}) {
   const [connection, setConnection] = useState('checking')
   const [mode, setMode] = useState('upload')
   const [language, setLanguage] = useState('ko')
-  const [conversation, setConversation] = useState('')
   const [file, setFile] = useState(null)
   const [recordingSource, setRecordingSource] = useState('microphone')
   const [audioUrl, setAudioUrl] = useState('')
@@ -181,7 +180,6 @@ function App({ onSignOut } = {}) {
     try {
       let response
       if (kind === 'example') response = await getExample(controller.signal)
-      else if (kind === 'text') response = await analyzeText(conversation, controller.signal, config.llm_features_enabled)
       else response = await analyzeFile(file, language, controller.signal)
       if (controller.signal.aborted) return
       setResult(response)
@@ -218,7 +216,6 @@ function App({ onSignOut } = {}) {
       const session = await startRealtime({
         language,
         sourceType,
-        file: sourceType === 'file' ? file : null,
         maxDurationSeconds: config.max_audio_seconds,
         onRecordingReady: (blob) => {
           if (operationRef.current !== current) return
@@ -276,7 +273,6 @@ function App({ onSignOut } = {}) {
   }
 
   const progressText = {
-    text: '매뉴얼에서 다음 질문을 찾고 있어요',
     file: '음성 파일을 분석하고 있어요',
     example: '예시를 불러오고 있어요',
     connecting: '음성 입력과 서버를 연결하고 있어요',
@@ -324,7 +320,7 @@ function App({ onSignOut } = {}) {
           <div className="sidebar-workflow">
             <span className="nav-label">상담 분석 절차</span>
             <div>
-              <span>01</span>음성 또는 대화 입력
+              <span>01</span>음성 입력
             </div>
             <div>
               <span>02</span>전사 및 증상 확인
@@ -448,18 +444,6 @@ function App({ onSignOut } = {}) {
                     <Icon name="mic" size={16} />
                     실시간 녹음
                   </button>
-                  <button
-                    className={mode === 'text' ? 'active' : ''}
-                    aria-pressed={mode === 'text'}
-                    disabled={busy}
-                    onClick={() => {
-                      setMode('text')
-                      setError(null)
-                    }}
-                  >
-                    <Icon name="fileText" size={16} />
-                    대화 입력
-                  </button>
                 </div>
                 <label className="language-select">
                   <Icon name="globe" size={14} />
@@ -477,41 +461,7 @@ function App({ onSignOut } = {}) {
                   </select>
                 </label>
               </div>
-              {mode === 'text' ? (
-                <div className="manual-text-input">
-                  <label htmlFor="conversation-text">지금까지의 상담 대화</label>
-                  <textarea
-                    id="conversation-text"
-                    value={conversation}
-                    onChange={(event) => setConversation(event.target.value)}
-                    maxLength={20000}
-                    disabled={busy}
-                    placeholder={
-                      '신고자: 어머니가 머리가 아프고 토한다고 해요.\n상담원: 의식이 있습니까?\n신고자: 네, 의식은 또렷해요.'
-                    }
-                  />
-                  <div className="input-bottom">
-                    <span className="input-hint">
-                      화자를 구분해 입력한 뒤, 대화가 추가되면 다시 추천받을 수 있습니다.
-                    </span>
-                    {busy ? (
-                      <button className="button secondary-button" onClick={cancelOperation}>
-                        취소
-                        <Icon name="close" size={15} />
-                      </button>
-                    ) : (
-                      <button
-                        className="button primary-button"
-                        disabled={!conversation.trim()}
-                        onClick={() => runAnalysis('text')}
-                      >
-                        후속 질문 추천
-                        <Icon name="arrow" size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : mode === 'upload' ? (
+              {mode === 'upload' ? (
                 <>
                   <input
                     ref={fileInput}
@@ -643,11 +593,9 @@ function App({ onSignOut } = {}) {
                       <p>
                         {recording
                           ? '발화가 인식되면 전사와 분석 결과가 순차적으로 표시됩니다.'
-                          : recordingSource === 'file'
-                            ? '선택한 파일을 마이크 재녹음 없이 직접 분석합니다.'
-                            : recordingSource === 'system'
-                              ? '선택한 PC 소리만 입력합니다. 오디오 공유를 선택하세요. 화면 영상은 전송하지 않습니다.'
-                              : '현장 대화는 마이크로, PC 통화는 통화 오디오 또는 파일 직접 입력으로 분석해 주세요.'}
+                          : recordingSource === 'system'
+                            ? '선택한 PC 소리만 입력합니다. 오디오 공유를 선택하세요. 화면 영상은 전송하지 않습니다.'
+                            : '현장 대화는 마이크로, PC 통화는 통화 오디오로 분석해 주세요.'}
                       </p>
                     </div>
                     <Waveform level={level} active={recording} />
@@ -664,7 +612,6 @@ function App({ onSignOut } = {}) {
                         disabled={busy} onChange={(event) => setRecordingSource(event.target.value)}>
                         <option value="microphone">마이크</option>
                         <option value="system">PC·통화 오디오</option>
-                        <option value="file" disabled={!file}>선택한 파일 직접 입력</option>
                       </select>
                     </span>
                     {recording ? (
@@ -679,7 +626,7 @@ function App({ onSignOut } = {}) {
                       </button>
                     ) : (
                       <button className="button primary-button" onClick={() => beginRecording()}
-                        disabled={busy || (recordingSource === 'file' && (!file || durationExceeded))}>
+                        disabled={busy}>
                         <Icon name="mic" size={15} />
                         실시간 분석 시작
                       </button>
