@@ -2191,3 +2191,123 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* 파일 업로드와 실시간 녹음의 입력 영역 구도를 동일하게 맞춤 */
+.dropzone {
+  justify-content: flex-start;
+  min-height: 105px;
+  padding: 20px;
+}
+.upload-content {
+  justify-content: flex-start;
+}
+.upload-content > div:not(.upload-symbol) {
+  flex: 1;
+}
+.upload-content h3 {
+  font-size: 14px;
+}
+.upload-content p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.file-pick-button {
+  height: 30px;
+  min-height: 0;
+  padding: 0 12px;
+  font-size: 13px;
+}
+.input-bottom .primary-button,
+.input-bottom .stop-button {
+  min-width: 160px;
+  justify-content: center;
+}
+
+/* 상담 입력 제목 바로 옆에 상태 배지 배치 */
+.input-card .card-heading {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+/* 전사 내용: 좌우 말풍선 대신 가운데 정렬, 화자는 이름·색·왼쪽 선으로 구분 */
+.transcript-box {
+  align-items: center;
+}
+.transcript-segment,
+.transcript-segment.speaker-caller {
+  align-self: center;
+  flex-direction: row;
+  width: 100%;
+  max-width: 680px;
+}
+.segment-content,
+.speaker-caller .segment-content {
+  border-radius: 8px;
+  border-left-width: 4px;
+}
+.speaker-operator .segment-content {
+  border-left-color: var(--info);
+}
+.speaker-caller .segment-content {
+  border-left-color: var(--accent);
+}
+.speaker-unknown .segment-content {
+  border-style: dashed;
+  border-left-style: dashed;
+  border-left-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+/* 전사 내용: 채팅 말풍선 없이 시간순 목록으로 표시 (화자는 이름 태그로 구분) */
+.transcript-box {
+  align-items: stretch;
+  gap: 0;
+  padding: 4px 20px 8px;
+}
+.transcript-segment,
+.transcript-segment.speaker-caller {
+  display: block;
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.transcript-segment:last-of-type {
+  border-bottom: 0;
+}
+.transcript-segment .speaker-avatar {
+  display: none;
+}
+.segment-content,
+.speaker-caller .segment-content,
+.speaker-unknown .segment-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.speaker-label {
+  padding: 2px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--panel-alt);
+}
+.speaker-operator .speaker-label {
+  color: var(--info);
+  border-color: var(--info-border);
+  background: var(--info-soft);
+}
+.speaker-caller .speaker-label {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+.speaker-unknown .speaker-label {
+  color: var(--muted);
+  border-style: dashed;
+  background: var(--surface-3);
+}
