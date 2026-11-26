@@ -40,6 +40,7 @@
   --accent-soft: #2a2650;
   --accent-border: #4a438c;
   --primary: #6b5ce7;
+  --primary-hover: #8071ee;
   --on-primary: #ffffff;
   --success: #6fd6a6;
   --success-soft: #12281f;
@@ -55,41 +56,42 @@
   --info-border: #25505f;
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
-/* 라이트 1: 소프트 파스텔 */
+/* 라이트: 연한 회색 바탕 + 검정 포인트 */
 :root[data-theme='light'] {
   color-scheme: light;
-  --page-bg: linear-gradient(160deg, #f5eefa 0%, #fbe9ef 100%);
-  --background: #f5eefa;
-  --sidebar: #fbf7fd;
+  --page-bg: #f1f2f4;
+  --background: #f1f2f4;
+  --sidebar: #f8f9fa;
   --panel: #ffffff;
-  --panel-alt: #f4f1fa;
-  --surface-3: #ece6f5;
-  --surface-4: #e1d9ef;
-  --border: #e6ddf0;
-  --border-strong: #d3c8e6;
-  --text: #1e1b3a;
-  --text-2: #34314f;
-  --muted: #5b5878;
-  --subtle: #6e6b8a;
-  --accent: #5b4fd6;
-  --accent-muted: #7468c8;
-  --accent-soft: #ece9ff;
-  --accent-border: #cfc8f5;
-  --primary: #5b4fd6;
+  --panel-alt: #f4f5f7;
+  --surface-3: #eceef1;
+  --surface-4: #e1e4e8;
+  --border: #dde0e5;
+  --border-strong: #c3c8cf;
+  --text: #16181d;
+  --text-2: #2c3038;
+  --muted: #565c66;
+  --subtle: #6a707a;
+  --accent: #262a31;
+  --accent-muted: #5a606a;
+  --accent-soft: #eceef1;
+  --accent-border: #d0d4da;
+  --primary: #16181d;
+  --primary-hover: #343942;
   --on-primary: #ffffff;
-  --success: #1f7a55;
-  --success-soft: #e3f5ec;
-  --success-border: #b7e0c9;
-  --danger: #b3203a;
-  --danger-soft: #fdeaee;
-  --danger-border: #f6c9d2;
-  --warn: #8a4b00;
-  --warn-soft: #fff0d9;
-  --warn-border: #f3d7a8;
+  --success: #1c7448;
+  --success-soft: #e6f4ec;
+  --success-border: #b4dcc5;
+  --danger: #b81f2a;
+  --danger-soft: #fdecec;
+  --danger-border: #f2c3c6;
+  --warn: #8f5200;
+  --warn-soft: #fff4e0;
+  --warn-border: #f0d49f;
   --info: #0b6a8a;
-  --info-soft: #e0f3fa;
-  --info-border: #b5deec;
-  --shadow: 0 8px 24px rgba(91, 79, 214, 0.1);
+  --info-soft: #e3f3f9;
+  --info-border: #b5dcea;
+  --shadow: 0 1px 3px rgba(22, 24, 29, 0.08);
 }
 * {
   box-sizing: border-box;

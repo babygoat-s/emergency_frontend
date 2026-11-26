@@ -21,7 +21,7 @@ const source = {
   question_id: 'PRIVATE_QUESTION_ID', original_question_id: '99',
 }
 
-test('deferred AI hides summary and urgency while preserving symptoms and grounded questions', () => {
+test('deferred AI hides summary while preserving symptoms and grounded questions', () => {
   const html = renderToStaticMarkup(createElement(Results, {
     llmEnabled: false, operation: 'idle', streamState: EMPTY_STREAM,
     result: { status: 'completed', transcript: { text: '팔이 마비됐어요', provider: 'local' },
@@ -31,7 +31,7 @@ test('deferred AI hides summary and urgency while preserving symptoms and ground
       state: { fields: {} }, safety_alerts: [], classification_references: [], instruction_references: [] },
       warnings: [] },
   }))
-  assert.doesNotMatch(html, /상담 요약|긴급도 -|요약 대기/)
+  assert.doesNotMatch(html, /상담 요약|긴급도|요약 대기|상담 정보 확인 상태|원문 조건/)
   assert.match(html, /전신쇠약/)
   assert.match(html, /얼굴이나 팔·다리에 마비/)
 })
@@ -48,7 +48,6 @@ test('source labels use SOP printed pages and manual physical PDF pages', () => 
 test('text RAG results show summary without clinical analysis and no PDF links or question IDs', () => {
   const rag = {
     summary: '환자가 두통과 구토를 호소합니다.', summary_provider: 'llm',
-    urgency: { level: 'high', reason: '보고된 증상 악화의 확인이 필요합니다.', origin: 'llm' },
     questions: [{
       question: '두통이 있는 환자분은 지금 의식이 또렷한가요?',
       reason: '현재 의식 상태가 확인되지 않았습니다.',
@@ -69,8 +68,7 @@ test('text RAG results show summary without clinical analysis and no PDF links o
   assert.match(html, /LLM 요약/)
   assert.match(html, /환자가 두통과 구토를 호소합니다./)
   assert.doesNotMatch(html, /현재 의식 상태가 확인되지 않았습니다./)
-  assert.match(html, /긴급도 - 상/)
-  assert.match(html, /LLM 검토 제안/)
+  assert.doesNotMatch(html, /긴급도|LLM 검토 제안|상담 정보 확인 상태|원문 조건/)
   assert.match(html, /119구급상황관리센터 상담 매뉴얼 · PDF 13쪽/)
   assert.doesNotMatch(html, /href=|<iframe|<embed|<object|PRIVATE_QUESTION_ID|질문 ID|원문 번호|\.pdf/)
   assert.doesNotMatch(html, /오래된 첨부 매뉴얼|의료 전문가 검증 전/)
@@ -122,7 +120,6 @@ test('late RAG summaries cannot replace a newer conversation summary', () => {
 test('a temporary LLM failure retains the last summary without replacing it with utterances', () => {
   const base = { transcript: { text: '원본 발화' }, rag: {
     summary: '환자가 두통을 호소합니다.', summary_provider: 'llm',
-    urgency: { level: 'moderate', reason: '증상 확인 필요', origin: 'llm' },
   } }
   let state = mergeStreamEvent(EMPTY_STREAM, {
     type: 'update', stage: 'analysis', sequence: 1, data: base,
@@ -130,13 +127,12 @@ test('a temporary LLM failure retains the last summary without replacing it with
   state = mergeStreamEvent(state, {
     type: 'update', stage: 'audio', sequence: 2, processing_lag_seconds: 3,
     data: { transcript: { text: '새 원본 발화' }, rag: {
-      summary: null, summary_provider: 'pending', urgency: { level: 'unknown' },
+      summary: null, summary_provider: 'pending',
     } },
   })
   assert.equal(state.lastSummary.text, '환자가 두통을 호소합니다.')
   assert.equal(state.lastSummary.sequence, 1)
   assert.equal(state.data.rag.summary, null)
-  assert.equal(state.lastUrgency.level, 'moderate')
   assert.equal(state.processingLagSeconds, 3)
 })
 
@@ -156,14 +152,13 @@ test('a delayed LLM result updates its summary cursor while keeping the newest t
       transcript: { text: '이전 발화' },
       rag: {
         questions: [detailed], state: { fields: {} }, summary: '완성된 LLM 요약',
-        summary_provider: 'llm', urgency: { level: 'moderate', origin: 'llm' },
+        summary_provider: 'llm',
       },
     },
   })
   assert.equal(state.data.transcript.text, '최신 발화')
   assert.equal(state.data.rag, current)
   assert.equal(state.lastSummary.text, '완성된 LLM 요약')
-  assert.equal(state.lastUrgency.level, 'moderate')
   const visible = selectManualResult(null, state)
   assert.equal(visible.questions[0], detailed)
   assert.equal(visible.using_previous_llm_questions, true)
@@ -197,12 +192,11 @@ test('a report that breathing is present does not answer a source question about
   assert.equal(selectManualResult(null, state).questions.length, 1)
 })
 
-test('retired acoustic data and non-LLM urgency are never rendered', () => {
+test('retired acoustic data is never rendered', () => {
   const html = renderToStaticMarkup(createElement(Results, {
     result: {
       rag: {
         summary: null, summary_provider: 'pending', llm_status: 'not_requested',
-        urgency: { level: 'critical', reason: 'OLD_LOCAL_LEVEL', origin: 'retired_rule' },
         questions: [], state: { fields: {} }, safety_alerts: [],
         classification_references: [], instruction_references: [], message: '근거 확인',
       },
@@ -214,41 +208,5 @@ test('retired acoustic data and non-LLM urgency are never rendered', () => {
     },
     streamState: EMPTY_STREAM, operation: 'idle',
   }))
-  assert.doesNotMatch(html, /음성 상태|말속도|울음 감지|긴급도 - 최상|OLD_LOCAL_LEVEL/)
-  assert.match(html, /긴급도 - 분석 대기/)
-})
-
-test('LLM insufficient-evidence decisions are distinct from unavailable analysis', () => {
-  const rag = {
-    summary: null, summary_provider: 'unavailable', llm_status: 'partial',
-    urgency: { level: 'unknown', reason: '근거 검증 실패', origin: 'unavailable' },
-    questions: [], state: { fields: {} }, safety_alerts: [],
-    classification_references: [], instruction_references: [], message: '근거 확인',
-  }
-  const render = () => renderToStaticMarkup(createElement(Results, {
-    result: { rag, transcript: { text: '대화 입력', provider: 'text' } },
-    streamState: EMPTY_STREAM, operation: 'idle',
-  }))
-  assert.match(render(), /긴급도 - 분석 미완료/)
-  rag.urgency = { level: 'unknown', reason: '추가 정보가 필요합니다.', origin: 'llm' }
-  assert.match(render(), /긴급도 - 판단 보류/)
-})
-
-test('a newer explicit LLM hold replaces the last LLM level instead of resurrecting it', () => {
-  const event = (sequence, urgency) => ({
-    type: 'update', stage: 'analysis', sequence,
-    data: { transcript: { text: '대화' }, rag: { urgency } },
-  })
-  let state = mergeStreamEvent(EMPTY_STREAM, event(1, { level: 'high', origin: 'llm' }))
-  state = mergeStreamEvent(state, event(2, {
-    level: 'unknown', reason: '추가 정보 필요', origin: 'llm',
-  }))
-  state = mergeStreamEvent(state, {
-    type: 'update', stage: 'audio', sequence: 3,
-    data: { transcript: { text: '새 대화' }, rag: {
-      urgency: { level: 'unknown', origin: 'unavailable' },
-    } },
-  })
-  assert.equal(state.lastUrgency.level, 'unknown')
-  assert.equal(state.lastUrgency.sequence, 2)
+  assert.doesNotMatch(html, /음성 상태|말속도|울음 감지|긴급도/)
 })

@@ -300,11 +300,12 @@
 }
 .primary-button {
   background: var(--primary);
-  border-color: var(--accent);
-  color: var(--text);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 .primary-button:hover:not(:disabled) {
-  background: var(--accent);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 .secondary-button {
   color: var(--text-2);
@@ -1027,74 +1028,6 @@
   gap: 13px;
   min-width: 0;
 }
-.urgency-body {
-  padding: 16px;
-}
-.urgency-value {
-  font-size: 19px;
-  font-weight: 550;
-  color: var(--text-2);
-  letter-spacing: -0.4px;
-}
-.urgency-critical .urgency-value {
-  color: var(--danger);
-}
-.urgency-high .urgency-value {
-  color: var(--warn);
-}
-.urgency-moderate .urgency-value {
-  color: var(--warn);
-}
-.urgency-low .urgency-value {
-  color: var(--success);
-}
-.urgency-meter {
-  display: flex;
-  list-style: none;
-  gap: 5px;
-  padding: 0;
-  margin: 14px 0 9px;
-}
-.urgency-meter li {
-  flex: 1;
-  min-width: 0;
-}
-.urgency-meter li > span {
-  height: 3px;
-  background: var(--surface-4);
-  display: block;
-  border-radius: 1px;
-}
-.urgency-meter small {
-  display: block;
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 6px;
-}
-.urgency-meter .active > span {
-  background: var(--muted);
-}
-.urgency-meter .active.urgency-low > span {
-  background: var(--success);
-}
-.urgency-meter .active.urgency-moderate > span {
-  background: var(--warn);
-}
-.urgency-meter .active.urgency-high > span {
-  background: var(--warn);
-}
-.urgency-meter .active.urgency-critical > span {
-  background: var(--danger);
-}
-.urgency-meter [aria-current] small {
-  color: var(--text);
-}
-.urgency-reason {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.85;
-}
 .summary-body {
   padding: 14px 16px 16px;
 }
@@ -1108,19 +1041,6 @@
   line-height: 1.9;
   margin-top: 0;
   word-break: keep-all;
-}
-.immediate-review {
-  color: var(--danger);
-  border: 1px solid var(--danger-border);
-  background: var(--danger-soft);
-  border-radius: 4px;
-  padding: 8px;
-  margin-top: 10px;
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  font-size: 13px;
-  line-height: 1.8;
 }
 .symptom-section {
   padding: 16px;
@@ -1302,31 +1222,6 @@
   line-height: 1.9;
   color: var(--text-2);
 }
-.manual-state {
-  margin: 10px 0 0;
-}
-.manual-state > div {
-  display: grid;
-  grid-template-columns: 95px minmax(0, 1fr);
-  padding: 9px 0;
-  border-bottom: 1px solid var(--border);
-  gap: 10px;
-}
-.manual-state dt {
-  color: var(--muted);
-}
-.manual-state dd {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: var(--text-2);
-  overflow-wrap: anywhere;
-}
-.field-status {
-  font-size: 12px;
-  font-weight: 500;
-}
 .status-confirmed {
   color: var(--success);
 }
@@ -1335,11 +1230,6 @@
 }
 .status-uncertain {
   color: var(--warn);
-}
-.manual-state small {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.8;
 }
 .manual-note {
   color: var(--muted);
@@ -1461,54 +1351,6 @@
   font-size: 12px;
   padding: 4px 6px;
   border-radius: 3px;
-}
-.urgency-scale {
-  border-top: 1px solid var(--border);
-  margin-top: 14px;
-  padding-top: 12px;
-}
-.urgency-scale h3 {
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 500;
-}
-.urgency-scale ol {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  list-style: none;
-  padding: 0;
-  margin: 8px 0;
-}
-.urgency-scale p {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.85;
-}
-.badge.urgency-minimal {
-  background: var(--surface-3);
-  color: var(--text-2);
-  border-color: var(--border-strong);
-}
-.badge.urgency-low {
-  background: var(--success-soft);
-  color: var(--success);
-  border-color: var(--success-border);
-}
-.badge.urgency-moderate {
-  background: var(--warn-soft);
-  color: var(--warn);
-  border-color: var(--warn-border);
-}
-.badge.urgency-high {
-  background: var(--warn-soft);
-  color: var(--warn);
-  border-color: var(--warn-border);
-}
-.badge.urgency-critical {
-  background: var(--danger-soft);
-  color: var(--danger);
-  border-color: var(--danger-border);
 }
 .example-description {
   color: var(--muted);
@@ -1724,53 +1566,6 @@
   background: var(--accent-soft);
   border-color: var(--accent-border);
 }
-.analysis-card.urgency-critical {
-  background: var(--danger-soft);
-  border-color: var(--danger-border);
-}
-.analysis-card.urgency-high,
-.analysis-card.urgency-moderate {
-  background: var(--warn-soft);
-  border-color: var(--warn-border);
-}
-.analysis-card.urgency-low {
-  background: var(--success-soft);
-  border-color: var(--success-border);
-}
-.analysis-card.urgency-minimal {
-  background: var(--info-soft);
-  border-color: var(--info-border);
-}
-.urgency-body {
-  padding: 18px 20px;
-}
-.urgency-value {
-  font-size: 30px;
-  font-weight: 700;
-}
-.urgency-meter {
-  gap: 6px;
-  margin: 16px 0 10px;
-}
-.urgency-meter li > span {
-  height: 8px;
-  border-radius: 2px;
-}
-.urgency-meter small {
-  font-size: 14px;
-}
-.urgency-reason {
-  color: var(--text-2);
-  font-size: 15px;
-  line-height: 1.7;
-}
-.immediate-review {
-  margin-top: 12px;
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 700;
-}
 .symptom-section {
   padding: 16px 20px 20px;
 }
@@ -1861,11 +1656,11 @@
     justify-content: center;
   }
   .brand > span:last-child,
-  .workspace-label,
-  .nav-label,
-  .nav-item > span,
-  .sidebar-workflow,
-  .sidebar-bottom {
+.workspace-label,
+.nav-label,
+.nav-item > span,
+.sidebar-workflow,
+.sidebar-bottom {
     display: none;
   }
   .primary-nav {
@@ -1948,7 +1743,7 @@
     font-size: 13px;
   }
   .breadcrumb > span,
-  .breadcrumb > svg:nth-of-type(2) {
+.breadcrumb > svg:nth-of-type(2) {
     display: none;
   }
   .connection-status {
@@ -2124,9 +1919,8 @@
   .questions-card {
     grid-column: auto;
   }
-  .urgency-body,
   .symptom-section,
-  .questions-body {
+.questions-body {
     padding: 14px;
   }
   .question-list p {
@@ -2141,9 +1935,6 @@
   }
   .example-card {
     grid-column: auto;
-  }
-  .manual-state > div {
-    grid-template-columns: 85px minmax(0, 1fr);
   }
   .transcript-footer {
     font-size: 12px;
