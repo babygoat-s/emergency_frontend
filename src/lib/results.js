@@ -11,7 +11,6 @@ export const EMPTY_STREAM = {
   symptomError: null,
   analysisError: null,
   lastSummary: null,
-  lastUrgency: null,
   lastManual: null,
   processingLagSeconds: 0,
   revisionSequence: 0,
@@ -24,7 +23,7 @@ export function mergeStreamEvent(previous, event) {
   const next = { ...previous, data: { ...(previous.data || data) } }
   if ((data.transcript?.revision || 0) > (previous.data?.transcript?.revision || 0)) {
     next.revisionSequence = sequence
-    next.lastSummary = next.lastUrgency = next.lastManual = null
+    next.lastSummary = next.lastManual = null
     next.data.analysis = null
     next.data.symptoms = []
     next.data.symptom_provider = null
@@ -39,10 +38,6 @@ export function mergeStreamEvent(previous, event) {
   if (data.rag?.summary_provider === 'llm' && data.rag.summary &&
       sequence >= (previous.lastSummary?.sequence || 0)) {
     next.lastSummary = { text: data.rag.summary, sequence }
-  }
-  if (data.rag?.urgency?.origin === 'llm' &&
-      sequence >= (previous.lastUrgency?.sequence || 0)) {
-    next.lastUrgency = { ...data.rag.urgency, sequence }
   }
   if (data.rag?.summary_provider === 'llm' &&
       sequence >= (previous.lastManual?.sequence || 0)) {

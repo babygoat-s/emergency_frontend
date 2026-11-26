@@ -4,7 +4,7 @@ import { startRealtime } from './audio/realtime'
 import { EMPTY_STREAM, formatTime, mergeStreamEvent, validateFile } from './lib/results'
 import { RESEARCH_NOTICE } from './lib/manuals'
 import Icon from './components/Icon'
-import Results, { UrgencyScale } from './components/Results'
+import Results from './components/Results'
 import AudioPlayer from './components/AudioPlayer'
 import ThemeSwitch from './components/ThemeSwitch'
 import './App.css'
@@ -635,7 +635,7 @@ function App({ onSignOut } = {}) {
                   ? '개인정보 보호 설정을 확인한 뒤 분석할 수 있습니다.'
                   : config.llm_external_enabled
                     ? '식별정보 가림 적용 · 외부 AI 사용'
-                    : `외부 AI 전송 차단 · 서버 내부에서 분석${config.llm_features_enabled ? '' : ' · 요약·긴급도 AI 보류'}`}
+                    : `외부 AI 전송 차단 · 서버 내부에서 분석${config.llm_features_enabled ? '' : ' · 요약 AI 보류'}`}
               </div>
               {busy && (
                 <div className="operation-status" role="status">
@@ -728,7 +728,6 @@ function App({ onSignOut } = {}) {
                 ) : (
                   <p className="muted small">서버 연결 후 분류 대상을 표시합니다.</p>
                 )}
-                {config.llm_features_enabled && <UrgencyScale />}
               </section>
               <section className="card example-card">
                 <div className="aside-heading">
