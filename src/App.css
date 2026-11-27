@@ -493,7 +493,6 @@
 .dropzone,
 .record-zone,
 .input-bottom,
-.manual-text-input,
 .operation-status,
 .validation-note,
 .input-card > .error-message {
@@ -767,32 +766,6 @@
   background: var(--danger-soft);
   border-color: var(--danger-border);
   color: var(--danger);
-}
-.manual-text-input {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-.manual-text-input > label {
-  font-size: 13px;
-  color: var(--text-2);
-}
-.manual-text-input textarea {
-  width: 100%;
-  min-height: 150px;
-  padding: 13px;
-  resize: vertical;
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.9;
-  color: var(--text);
-  background: var(--sidebar);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-}
-.manual-text-input textarea::placeholder {
-  color: var(--subtle);
 }
 .results-section {
   margin-top: 26px;
@@ -1962,9 +1935,6 @@
 .theme-switch {
   display: flex;
   gap: 10px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
 }
 .theme-switch button {
   padding: 2px 0;
@@ -2102,3 +2072,8 @@
   border-style: dashed;
   background: var(--surface-3);
 }
+
+.voice-sample-toggle { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.voice-sample-toggle input { accent-color: var(--primary); }
+.voice-sample-list { margin: 12px 0 0; padding: 14px 18px 14px 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-alt); color: var(--text); font-size: 15px; line-height: 2; }
+.input-actions { display: inline-flex; gap: 10px; align-items: center; }
