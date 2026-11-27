@@ -88,7 +88,7 @@ export default function Results({ result, streamState, operation, symptomCount =
     unavailable: '결과 검토 필요',
     pending: '부분 결과',
     no_speech: '발화 대기',
-  }[data?.status] || '입력 대기'
+  }[data?.status] || null
   const phase = busy
     ? operation === 'recording'
       ? '실시간 분석'
@@ -97,6 +97,7 @@ export default function Results({ result, streamState, operation, symptomCount =
   const processingTitle = {
     recording: '통화 음성을 수신하고 있습니다',
     connecting: '마이크 연결을 준비하고 있습니다',
+    registering: '상담원 음성을 등록하고 있습니다',
     finishing: '마지막 발화를 처리하고 있습니다',
     text: '상담 내용을 확인하고 있습니다',
     example: '예시 결과를 불러오고 있습니다',
@@ -112,10 +113,12 @@ export default function Results({ result, streamState, operation, symptomCount =
       <div className="results-toolbar">
         <div className="section-title">
           <h2 id="results-title">분석 결과</h2>
-          <span className={`badge ${busy ? 'processing-badge' : data?.status === 'completed' ? 'complete-badge' : 'neutral-badge'}`}>
-            <span className="status-dot" />
-            {phase}
-          </span>
+          {phase && (
+            <span className={`badge ${busy ? 'processing-badge' : data?.status === 'completed' ? 'complete-badge' : 'neutral-badge'}`}>
+              <span className="status-dot" />
+              {phase}
+            </span>
+          )}
         </div>
         <div className="result-actions">
           {data?.is_demo && <span className="badge demo-badge">고정 예시</span>}
