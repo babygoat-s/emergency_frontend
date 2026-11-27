@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG = {
   koelectra_symptom_labels: [],
   example_preview: null,
   rag_enabled: false,
+  operator_voice_sample_supported: false,
 }
 
 export class ApiError extends Error {

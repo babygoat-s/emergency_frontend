@@ -22,6 +22,10 @@ const messages = {
   TRANSCRIPT_TOO_LONG: '분석할 내용이 너무 길어요. 더 짧은 음성으로 다시 시도해 주세요.',
   FRAME_TOO_LARGE: '음성 전송 중 문제가 발생했어요. 다시 녹음해 주세요.',
   INVALID_PCM: '음성 전송 중 문제가 발생했어요. 다시 녹음해 주세요.',
+  OPERATOR_VOICE_UNAVAILABLE: '상담원 음성 등록을 지원하지 않아요. 등록 없이 시작해 주세요.',
+  OPERATOR_VOICE_TOO_SHORT: '상담원 음성이 충분하지 않아요. 안내 문장을 4초 이상 또박또박 읽어 주세요.',
+  OPERATOR_VOICE_TOO_LONG: '상담원 음성 등록이 너무 길어요. 20초 이내로 읽어 주세요.',
+  OPERATOR_VOICE_INCONSISTENT: '등록한 음성이 한 사람의 목소리로 확인되지 않았어요. 한 명이 다시 읽어 주세요.',
   INVALID_STREAM_MESSAGE: '음성 연결 중 문제가 발생했어요. 다시 녹음해 주세요.',
 }
 

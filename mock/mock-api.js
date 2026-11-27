@@ -1,14 +1,14 @@
 // 개발 전용 목업 API. `npm run dev:mock` 일 때만 Vite 개발 서버에 붙는다.
 // 백엔드 없이 결과 화면을 확인하기 위한 용도이며 앱 코드는 건드리지 않는다.
 //
-// 시나리오 전환 (상황별 화면 확인, 긴급도는 화면에서 제거됨)
-//   방법 1) 주소 뒤에 붙이기:  http://localhost:5173/?scenario=critical
-//   방법 2) 고정 전환:         http://localhost:5173/__mock/scenario?name=critical
-//   시나리오: low | moderate(기본) | high | critical | empty
+// 시나리오 전환 (기본은 주소에 아무것도 붙이지 않은 화면)
+//   방법 1) 주소 뒤에 붙이기:  http://localhost:5173/?scenario=alert
+//   방법 2) 고정 전환:         http://localhost:5173/__mock/scenario?name=alert
+//   시나리오: default(기본) | alert(즉시 확인 경고가 뜨는 화면) | empty(증상·질문 없음)
 //   바꾼 뒤 분석을 다시 실행해야 새 결과가 보인다.
 
-const SCENARIOS = ['low', 'moderate', 'high', 'critical', 'empty']
-let current = 'moderate'
+const SCENARIOS = ['default', 'alert', 'empty']
+let current = 'default'
 
 const source = (qid) => ({
   document_id: 'manual', document_name: '구급상황관리센터 응급처치 지도 매뉴얼(목업)',
@@ -26,25 +26,7 @@ const question = (n, q, reason, symptom, field, excerpt) => ({
 })
 
 const DATA = {
-  low: {
-    segments: [
-      seg(0, 2, '119입니다. 어떤 증상이 있나요?', 'operator'),
-      seg(2, 7, '어제부터 머리가 조금 아프고 열이 37도 8부 정도 나요.', 'caller'),
-      seg(7, 10, '의식과 호흡은 괜찮으신가요?', 'operator'),
-      seg(10, 13, '네, 대화도 잘 하시고 숨도 편하게 쉬세요.', 'caller'),
-    ],
-    symptoms: [
-      { code: 'headache', label: '두통', evidence: '머리가 조금 아프고', score: 0.9 },
-      { code: 'fever', label: '고열', evidence: '열이 37도 8부', score: 0.52 },
-    ],
-    summary: '[목업] 신고자가 어제부터 시작된 경미한 두통과 미열을 호소하며, 의식과 호흡은 정상입니다.',
-    questions: [
-      question(1, '증상이 점점 심해지고 있나요?', '악화 여부 확인', '두통', 'progress', '증상 경과를 확인한다.'),
-      question(2, '복용한 약이 있나요?', '복용 약 확인', '두통', 'medication', '복용 약 여부를 확인한다.'),
-    ],
-    alerts: [], immediate: false,
-  },
-  moderate: {
+  default: {
     segments: [
       seg(0, 2, '119입니다. 어떤 증상이 있나요?', 'operator'),
       seg(2, 7, '열이 39도이고 토하고 머리가 아파요.', 'caller'),
@@ -65,26 +47,7 @@ const DATA = {
     ],
     alerts: [], immediate: false,
   },
-  high: {
-    segments: [
-      seg(0, 2, '119입니다. 어떤 증상이 있나요?', 'operator'),
-      seg(2, 8, '아버지가 가슴이 쥐어짜듯 아프시고 숨쉬기가 너무 힘들어하세요.', 'caller'),
-      seg(8, 11, '식은땀이 나거나 얼굴색이 변했나요?', 'operator'),
-      seg(11, 15, '네, 식은땀을 많이 흘리고 얼굴이 창백해요.', 'caller'),
-    ],
-    symptoms: [
-      { code: 'chest_pain', label: '가슴 통증', evidence: '가슴이 쥐어짜듯 아프시고', score: 0.95 },
-      { code: 'breathing_difficulty', label: '호흡 곤란', evidence: '숨쉬기가 너무 힘들어하세요', score: 0.91 },
-    ],
-    summary: '[목업] 신고자가 아버지의 가슴 통증과 호흡 곤란을 호소하며 식은땀과 창백함이 동반됩니다.',
-    questions: [
-      question(1, '환자가 지금 앉아 있나요, 누워 있나요?', '자세 확인', '가슴 통증', 'position', '환자 자세를 확인한다.'),
-      question(2, '이전에 심장 질환을 진단받은 적이 있나요?', '병력 확인', '가슴 통증', 'history', '심장 병력을 확인한다.'),
-      question(3, '통증이 시작된 지 얼마나 됐나요?', '발생 시각 확인', '가슴 통증', 'onset', '통증 시작 시점을 확인한다.'),
-    ],
-    alerts: ['가슴 통증과 호흡 곤란이 함께 있습니다. 즉시 출동 여부를 검토하세요.'], immediate: false,
-  },
-  critical: {
+  alert: {
     segments: [
       seg(0, 2, '119입니다. 어떤 증상이 있나요?', 'operator'),
       seg(2, 8, '아버지가 갑자기 쓰러지셨는데 숨을 안 쉬는 것 같아요. 불러도 대답이 없어요.', 'caller'),

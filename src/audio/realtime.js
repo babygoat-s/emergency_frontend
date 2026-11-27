@@ -4,7 +4,8 @@ import { publicErrorMessage } from '../lib/error-messages.js'
 import { pcmWavBlob } from './wav.js'
 
 export async function startRealtime({ language, signal, onEvent, onError, onLevel,
-  sourceType = 'microphone', file = null, maxDurationSeconds = 600, onSourceEnded, onRecordingReady }) {
+  sourceType = 'microphone', file = null, maxDurationSeconds = 600, onSourceEnded, onRecordingReady,
+  operatorSample = null }) {
   if (!window.isSecureContext || (sourceType === 'microphone' && !navigator.mediaDevices?.getUserMedia)) {
     throw new ApiError('녹음은 localhost 또는 HTTPS 환경에서 사용할 수 있어요.', 'MIC_UNAVAILABLE')
   }
@@ -17,6 +18,8 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
   let finished = false
   let stopping = false
   let failed = false
+  let registering = false
+  const requestSample = Boolean(operatorSample) && sourceType !== 'file'
   let finishTimer
   let openTimer
   const finishedPromise = new Promise((resolve) => { finishResolve = resolve })
@@ -83,11 +86,44 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
     await context.audioWorklet.addModule(new URL('./pcm-worklet.js', import.meta.url))
     assertActive()
 
+    // The same audio graph carries the operator voice sample first, then the call itself.
+    const connectAudio = () => {
+      if (node) return
+      node = new AudioWorkletNode(context, 'emergency-pcm')
+      node.port.onmessage = ({ data }) => {
+        if (data === 'flushed') { flushResolve?.(); return }
+        if (stopped || socket.readyState !== WebSocket.OPEN) return
+        if (socket.bufferedAmount > 320000) {
+          fail(new ApiError('음성 전송이 지연되어 녹음을 중단했어요. 연결 상태를 확인해 주세요.', 'STREAM_BACKPRESSURE'))
+          return
+        }
+        const pcm = new Int16Array(data)
+        if (onRecordingReady && !registering && sourceType !== 'file' && capturedBytes + data.byteLength <= maxDurationSeconds * 32000) {
+          capturedFrames.push(data)
+          capturedBytes += data.byteLength
+        }
+        let energy = 0
+        for (const sample of pcm) energy += (sample / 32768) ** 2
+        onLevel(Math.min(1, Math.sqrt(energy / pcm.length) * 5))
+        socket.send(data)
+      }
+      source = decodedFile ? context.createBufferSource() : context.createMediaStreamSource(stream)
+      if (decodedFile) source.buffer = decodedFile
+      source.connect(node)
+      node.connect(context.destination) // The processor outputs silence, avoiding microphone feedback.
+    }
+    const finishSample = () => {
+      if (!registering || socket?.readyState !== WebSocket.OPEN) return
+      registering = false
+      socket.send(JSON.stringify({ type: 'operator_voice_sample_end' }))
+    }
+
     const token = getAuthToken()
     socket = new WebSocket(realtimeUrl(), token ? ['emergency.v1', `auth.${token}`] : [])
     await new Promise((resolve, reject) => {
       openTimer = setTimeout(() => reject(new ApiError('실시간 서버 연결 시간이 초과됐어요.', 'WS_TIMEOUT')), 10000)
-      socket.onopen = () => socket.send(JSON.stringify({ type: 'start', encoding: 'pcm_s16le', sample_rate: 16000, channels: 1, language }))
+      socket.onopen = () => socket.send(JSON.stringify({ type: 'start', encoding: 'pcm_s16le', sample_rate: 16000, channels: 1, language,
+        ...(requestSample ? { operator_voice_sample: true } : {}) }))
       socket.onerror = () => reject(new ApiError('실시간 서버에 연결할 수 없어요.', 'WS_CONNECTION'))
       socket.onclose = () => {
         reject(new ApiError('실시간 연결이 종료됐어요.', 'WS_CLOSED'))
@@ -102,6 +138,14 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
         try { event = JSON.parse(data) }
         catch { fail(new ApiError('실시간 응답을 읽지 못했어요.', 'INVALID_RESPONSE')); return }
         if (event.type === 'ready') { clearTimeout(openTimer); resolve(); return }
+        if (event.type === 'operator_voice_sample_required') {
+          try {
+            registering = true
+            connectAudio()
+            operatorSample.onRequired(event, finishSample)
+          } catch (error) { reject(error); fail(error) }
+          return
+        }
         if (event.type === 'error') {
           const error = new ApiError(publicErrorMessage(event.error?.code), event.error?.code)
           reject(error)
@@ -119,28 +163,7 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
     })
     assertActive()
     socket.onerror = () => fail(new ApiError('음성 전송 중 연결 오류가 발생했어요.', 'WS_CONNECTION'))
-    node = new AudioWorkletNode(context, 'emergency-pcm')
-    node.port.onmessage = ({ data }) => {
-      if (data === 'flushed') { flushResolve?.(); return }
-      if (stopped || socket.readyState !== WebSocket.OPEN) return
-      if (socket.bufferedAmount > 320000) {
-        fail(new ApiError('음성 전송이 지연되어 녹음을 중단했어요. 연결 상태를 확인해 주세요.', 'STREAM_BACKPRESSURE'))
-        return
-      }
-      const pcm = new Int16Array(data)
-      if (onRecordingReady && sourceType !== 'file' && capturedBytes + data.byteLength <= maxDurationSeconds * 32000) {
-        capturedFrames.push(data)
-        capturedBytes += data.byteLength
-      }
-      let energy = 0
-      for (const sample of pcm) energy += (sample / 32768) ** 2
-      onLevel(Math.min(1, Math.sqrt(energy / pcm.length) * 5))
-      socket.send(data)
-    }
-    source = decodedFile ? context.createBufferSource() : context.createMediaStreamSource(stream)
-    if (decodedFile) source.buffer = decodedFile
-    source.connect(node)
-    node.connect(context.destination) // The processor outputs silence, avoiding microphone feedback.
+    connectAudio()
 
     const session = {
       cancel,
