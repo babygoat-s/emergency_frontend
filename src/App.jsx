@@ -38,6 +38,9 @@ function App({ onSignOut } = {}) {
   const [language, setLanguage] = useState('ko')
   const [file, setFile] = useState(null)
   const [recordingSource, setRecordingSource] = useState('microphone')
+  const [useOperatorVoice, setUseOperatorVoice] = useState(true)
+  const [sampleInfo, setSampleInfo] = useState(null)
+  const [sampleSeconds, setSampleSeconds] = useState(0)
   const [audioUrl, setAudioUrl] = useState('')
   const [duration, setDuration] = useState(null)
   const [dragging, setDragging] = useState(false)
@@ -52,11 +55,13 @@ function App({ onSignOut } = {}) {
   const fileInput = useRef(null)
   const operationRef = useRef(null)
   const startedAt = useRef(0)
+  const sampleStartedAt = useRef(0)
   const connectionRequest = useRef(null)
   const guideDialog = useRef(null)
   const guideTrigger = useRef(null)
   const busy = operation !== 'idle'
   const recording = operation === 'recording'
+  const registering = operation === 'registering'
   const durationExceeded =
     duration != null && Number.isFinite(duration) && duration > config.max_audio_seconds
 
@@ -129,6 +134,17 @@ function App({ onSignOut } = {}) {
     return () => clearInterval(timer)
   }, [recording, config.max_audio_seconds, stopRecording])
 
+  useEffect(() => {
+    if (!registering) return
+    const timer = setInterval(() => {
+      const elapsed = (Date.now() - sampleStartedAt.current) / 1000
+      setSampleSeconds(elapsed)
+      // The server rejects samples over its limit, so stop a little before it.
+      if (sampleInfo && elapsed >= sampleInfo.max - 1) operationRef.current?.finishSample?.()
+    }, 250)
+    return () => clearInterval(timer)
+  }, [registering, sampleInfo])
+
   function refreshConnection() {
     connectionRequest.current?.abort()
     const controller = new AbortController()
@@ -148,6 +164,10 @@ function App({ onSignOut } = {}) {
     setDuration(null)
     setResult(null)
     setStreamState(EMPTY_STREAM)
+  }
+
+  function finishSample() {
+    operationRef.current?.finishSample?.()
   }
 
   function cancelOperation() {
@@ -217,6 +237,22 @@ function App({ onSignOut } = {}) {
       const session = await startRealtime({
         language,
         sourceType,
+        operatorSample: config.operator_voice_sample_supported && useOperatorVoice
+          ? {
+              onRequired: (info, finish) => {
+                if (operationRef.current !== current) return
+                current.finishSample = finish
+                sampleStartedAt.current = Date.now()
+                setSampleSeconds(0)
+                setSampleInfo({
+                  sentences: Array.isArray(info.sentences) ? info.sentences.slice(0, 5) : [],
+                  min: Number(info.min_speech_seconds) || 4,
+                  max: Number(info.max_sample_seconds) || 20,
+                })
+                setOperation('registering')
+              },
+            }
+          : null,
         maxDurationSeconds: config.max_audio_seconds,
         onRecordingReady: (blob) => {
           if (operationRef.current !== current) return
@@ -277,6 +313,7 @@ function App({ onSignOut } = {}) {
     file: '음성 파일을 분석하고 있어요',
     example: '예시를 불러오고 있어요',
     connecting: '음성 입력과 서버를 연결하고 있어요',
+    registering: '상담원 음성을 등록하고 있어요',
     recording: '실시간으로 음성을 분석하고 있어요',
     finishing: reviewingAudio ? '반복 응답 구간의 원음을 다시 인식하고 있어요' : '마지막 음성의 분석을 마무리하고 있어요',
   }[operation]
@@ -318,28 +355,7 @@ function App({ onSignOut } = {}) {
               <span>사용 안내</span>
             </button>
           </nav>
-          <div className="sidebar-workflow">
-            <span className="nav-label">상담 분석 절차</span>
-            <div>
-              <span>01</span>음성 입력
-            </div>
-            <div>
-              <span>02</span>전사 및 증상 확인
-            </div>
-            <div>
-              <span>03</span>후속 질문 검토
-            </div>
-          </div>
           <div className="sidebar-bottom">
-            <span className="environment-label">
-              <span className="status-dot" />
-              연구용 프로토타입
-            </span>
-            <p>
-              분석 결과와 매뉴얼 근거는
-              <br />
-              담당자의 검토가 필요합니다.
-            </p>
             <ThemeSwitch />
             <span className="sidebar-version">119 상담 의사결정 지원</span>
           </div>
@@ -381,14 +397,6 @@ function App({ onSignOut } = {}) {
                 <p>통화 전사와 환자 상태를 확인하고, 다음 상담 질문을 검토합니다.</p>
               </div>
               <div className="page-actions">
-                <button
-                  className="button secondary-button"
-                  disabled={busy}
-                  onClick={() => runAnalysis('example')}
-                >
-                  <Icon name="play" size={15} />
-                  예시 불러오기
-                </button>
                 <button className="icon-button guide-trigger" onClick={openGuide} aria-label="사용 안내">
                   <Icon name="help" />
                 </button>
@@ -410,15 +418,11 @@ function App({ onSignOut } = {}) {
                   <Icon name="wave" size={17} />
                   <h2 id="input-title">상담 입력</h2>
                 </div>
-                <span className={`badge ${recording ? 'recording-badge' : 'neutral-badge'}`}>
-                  {recording
-                    ? '녹음 중'
-                    : busy
-                      ? '처리 중'
-                      : file && mode === 'upload'
-                        ? '파일 준비됨'
-                        : '입력 대기'}
-                </span>
+                {(busy || (file && mode === 'upload')) && (
+                  <span className={`badge ${recording ? 'recording-badge' : 'neutral-badge'}`}>
+                    {recording ? '녹음 중' : busy ? '처리 중' : '파일 준비됨'}
+                  </span>
+                )}
               </div>
               <div className="input-controls">
                 <div className="mode-switch" role="group" aria-label="상담 입력 방식">
@@ -570,7 +574,7 @@ function App({ onSignOut } = {}) {
                 </>
               ) : (
                 <>
-                  <div className={`record-zone ${recording ? 'recording' : ''}`}>
+                  <div className={`record-zone ${recording || registering ? 'recording' : ''}`}>
                     <span className="record-mic">
                       <Icon name="mic" size={24} />
                     </span>
@@ -578,7 +582,9 @@ function App({ onSignOut } = {}) {
                       <h3>
                         {recording
                           ? '신고 통화 녹음 중'
-                          : operation === 'connecting'
+                          : registering
+                            ? '상담원 음성 등록'
+                            : operation === 'connecting'
                             ? '음성 입력 연결 중'
                             : operation === 'finishing'
                               ? '마지막 발화 처리 중'
@@ -587,18 +593,27 @@ function App({ onSignOut } = {}) {
                       <p>
                         {recording
                           ? '발화가 인식되면 전사와 분석 결과가 순차적으로 표시됩니다.'
-                          : recordingSource === 'system'
+                          : registering
+                            ? `상담원 한 분이 아래 문장을 또박또박 읽어 주세요. 최소 ${sampleInfo?.min ?? 4}초 이상 필요하며, 등록한 음성은 화자 구분에만 쓰이고 이 통화에서만 사용됩니다.`
+                            : recordingSource === 'system'
                             ? '선택한 PC 소리만 입력합니다. 오디오 공유를 선택하세요. 화면 영상은 전송하지 않습니다.'
                             : '현장 대화는 마이크로, PC 통화는 통화 오디오로 분석해 주세요.'}
                       </p>
                     </div>
-                    <Waveform level={level} active={recording} />
+                    <Waveform level={level} active={recording || registering} />
                     <div className="record-timer">
                       <span className={recording ? 'record-dot' : 'timer-dot'} />
-                      {formatTime(seconds)}
-                      <small>/ {formatTime(config.max_audio_seconds)}</small>
+                      {registering ? formatTime(Math.floor(sampleSeconds)) : formatTime(seconds)}
+                      <small>/ {formatTime(registering ? sampleInfo?.max ?? 20 : config.max_audio_seconds)}</small>
                     </div>
                   </div>
+                  {registering && sampleInfo?.sentences.length > 0 && (
+                    <ol className="voice-sample-list" aria-label="상담원 음성 등록 문장">
+                      {sampleInfo.sentences.map((sentence) => (
+                        <li key={sentence}>{sentence}</li>
+                      ))}
+                    </ol>
+                  )}
                   <div className="input-bottom">
                     <span className="input-hint">
                       <Icon name="radio" size={14} />
@@ -607,8 +622,27 @@ function App({ onSignOut } = {}) {
                         <option value="microphone">마이크</option>
                         <option value="system">PC·통화 오디오</option>
                       </select>
+                      {config.operator_voice_sample_supported && (
+                        <label className="voice-sample-toggle">
+                          <input type="checkbox" checked={useOperatorVoice} disabled={busy}
+                            onChange={(event) => setUseOperatorVoice(event.target.checked)} />
+                          상담원 음성 등록
+                        </label>
+                      )}
                     </span>
-                    {recording ? (
+                    {registering ? (
+                      <span className="input-actions">
+                        <button className="button secondary-button" onClick={cancelOperation}>
+                          취소
+                          <Icon name="close" size={15} />
+                        </button>
+                        <button className="button primary-button" onClick={finishSample}
+                          disabled={sampleSeconds < (sampleInfo?.min ?? 4) + 1}>
+                          등록 완료
+                          <Icon name="arrow" size={15} />
+                        </button>
+                      </span>
+                    ) : recording ? (
                       <button className="button stop-button" onClick={stopRecording}>
                         <Icon name="stop" size={14} />
                         녹음 종료
@@ -629,14 +663,14 @@ function App({ onSignOut } = {}) {
                   {audioUrl && !busy && <AudioPlayer key={audioUrl} src={audioUrl} onDuration={setDuration} />}
                 </>
               )}
-              <div className="privacy-status" role="note">
-                <Icon name="shield" size={14} />
-                {!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode)
-                  ? '개인정보 보호 설정을 확인한 뒤 분석할 수 있습니다.'
-                  : config.llm_external_enabled
-                    ? '식별정보 가림 적용 · 외부 AI 사용'
-                    : `외부 AI 전송 차단 · 서버 내부에서 분석${config.llm_features_enabled ? '' : ' · 요약 AI 보류'}`}
-              </div>
+              {(!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode) || config.llm_external_enabled) && (
+                <div className="privacy-status" role="note">
+                  <Icon name="shield" size={14} />
+                  {!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode)
+                    ? '개인정보 보호 설정을 확인한 뒤 분석할 수 있습니다.'
+                    : '식별정보 가림 적용 · 외부 AI 사용'}
+                </div>
+              )}
               {busy && (
                 <div className="operation-status" role="status">
                   <Icon
