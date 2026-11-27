@@ -17,6 +17,7 @@ export const DEFAULT_CONFIG = {
   languages: ['ko', 'en', 'ja', 'auto'],
   realtime_window_seconds: 6,
   koelectra_symptom_labels: [],
+  operator_voice_sample_supported: false,
   example_preview: null,
   rag_enabled: false,
 }

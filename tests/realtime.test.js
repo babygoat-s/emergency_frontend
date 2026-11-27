@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { startRealtime } from '../src/audio/realtime.js'
+import { validateOperatorVoiceSample } from '../src/audio/realtime-socket.js'
 import { setAuthToken } from '../src/api/session.js'
 
-function setup(t, { permission, onSend, displayPermission } = {}) {
+function setup(t, { permission, onSend, displayPermission, sampleError } = {}) {
   const state = { messages: [], errors: [], events: [], stoppedTracks: 0, closedContexts: 0 }
   class Socket {
     static OPEN = 1
@@ -19,7 +20,12 @@ function setup(t, { permission, onSend, displayPermission } = {}) {
       state.messages.push(message)
       if (typeof message === 'string') {
         const event = JSON.parse(message)
-        if (event.type === 'start') queueMicrotask(() => this.onmessage?.({ data: JSON.stringify({ type: 'ready' }) }))
+        if (event.type === 'start') queueMicrotask(() => this.onmessage?.({ data: JSON.stringify(
+          event.operator_voice_sample ? { type: 'operator_voice_sample_required', max_frame_bytes: 32000 } : { type: 'ready' },
+        ) }))
+        if (event.type === 'operator_voice_sample_end') queueMicrotask(() => this.onmessage?.({ data: JSON.stringify(
+          sampleError ? { type: 'error', error: { code: sampleError } } : { type: 'ready' },
+        ) }))
         if (event.type === 'finish') queueMicrotask(() => {
           if (onSend) onSend(this)
           else this.onmessage?.({ data: JSON.stringify({ type: 'finished' }) })
@@ -96,6 +102,29 @@ test('WebSocket authentication sends the token only in the handshake', async (t)
   assert.equal(state.socket.url, 'ws://localhost:5173/api/v1/analysis/realtime')
   assert.equal(state.messages[0].includes('test.session.token'), false)
   await session.stop()
+})
+
+test('saved operator audio reaches the backend before the live PCM stream', async (t) => {
+  const { state } = setup(t)
+  const voice = new ArrayBuffer(128002)
+  new Uint8Array(voice).fill(7)
+  const session = await startRealtime({ language: 'ko', operatorVoiceSample: voice,
+    onEvent() {}, onError() {}, onLevel() {} })
+  assert.equal(JSON.parse(state.messages[0]).operator_voice_sample, true)
+  assert.deepEqual(state.messages.slice(1, 6).map((frame) => frame.byteLength), [32000, 32000, 32000, 32000, 2])
+  assert.ok(state.messages.slice(1, 6).every((frame) => new Uint8Array(frame).every((value) => value === 7)))
+  assert.equal(JSON.parse(state.messages[6]).type, 'operator_voice_sample_end')
+  await session.stop()
+  assert.equal(state.messages[7].byteLength, 100)
+  assert.equal(JSON.parse(state.messages[8]).type, 'finish')
+})
+
+test('sample validation sends enrollment only and rejects samples without enough speech', async (t) => {
+  const { state } = setup(t, { sampleError: 'OPERATOR_VOICE_TOO_SHORT' })
+  await assert.rejects(validateOperatorVoiceSample(new ArrayBuffer(128000)), { code: 'OPERATOR_VOICE_TOO_SHORT' })
+  assert.equal(JSON.parse(state.messages.at(-1)).type, 'operator_voice_sample_end')
+  assert.equal(state.node, undefined)
+  assert.equal(state.socket.readyState, 3)
 })
 
 test('cancellation during a pending microphone request stops the microphone when permission resolves', async (t) => {

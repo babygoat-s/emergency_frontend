@@ -6,6 +6,8 @@ import { RESEARCH_NOTICE } from './lib/manuals'
 import Icon from './components/Icon'
 import Results, { UrgencyScale } from './components/Results'
 import AudioPlayer from './components/AudioPlayer'
+import OperatorVoiceDialog from './components/OperatorVoiceDialog'
+import { loadOperatorVoice, removeOperatorVoice } from './lib/operator-voice-storage'
 import './App.css'
 
 const languageNames = { ko: '한국어', en: '영어', ja: '일본어', auto: '자동 감지' }
@@ -30,7 +32,7 @@ function Waveform({ level, active }) {
   )
 }
 
-function App({ onSignOut } = {}) {
+function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
   const [config, setConfig] = useState(DEFAULT_CONFIG)
   const [connection, setConnection] = useState('checking')
   const [mode, setMode] = useState('upload')
@@ -49,12 +51,17 @@ function App({ onSignOut } = {}) {
   const [seconds, setSeconds] = useState(0)
   const [level, setLevel] = useState(0)
   const [guideOpen, setGuideOpen] = useState(false)
+  const [operatorVoiceSample, setOperatorVoiceSample] = useState(undefined)
+  const [operatorVoiceOpen, setOperatorVoiceOpen] = useState(false)
+  const [operatorVoiceError, setOperatorVoiceError] = useState('')
+  const [removingOperatorVoice, setRemovingOperatorVoice] = useState(false)
   const fileInput = useRef(null)
   const operationRef = useRef(null)
   const startedAt = useRef(0)
   const connectionRequest = useRef(null)
   const guideDialog = useRef(null)
   const guideTrigger = useRef(null)
+  const operatorVoiceTrigger = useRef(null)
   const busy = operation !== 'idle'
   const recording = operation === 'recording'
   const durationExceeded =
@@ -77,6 +84,19 @@ function App({ onSignOut } = {}) {
       operationRef.current?.session?.cancel()
     }
   }, [updateConnection])
+
+  useEffect(() => {
+    let active = true
+    loadOperatorVoice(operatorVoiceScope).then((sample) => {
+      if (active) setOperatorVoiceSample(sample)
+    }).catch(() => {
+      if (active) {
+        setOperatorVoiceSample(null)
+        setOperatorVoiceError('이 브라우저의 음성 저장소를 열지 못했어요.')
+      }
+    })
+    return () => { active = false }
+  }, [operatorVoiceScope])
 
   useEffect(() => {
     if (!file) return
@@ -218,6 +238,7 @@ function App({ onSignOut } = {}) {
       const session = await startRealtime({
         language,
         sourceType,
+        operatorVoiceSample: config.operator_voice_sample_supported ? operatorVoiceSample : null,
         file: sourceType === 'file' ? file : null,
         maxDurationSeconds: config.max_audio_seconds,
         onRecordingReady: (blob) => {
@@ -273,6 +294,24 @@ function App({ onSignOut } = {}) {
   function openGuide(event) {
     guideTrigger.current = event.currentTarget
     setGuideOpen(true)
+  }
+
+  function closeOperatorVoice() {
+    setOperatorVoiceOpen(false)
+    requestAnimationFrame(() => operatorVoiceTrigger.current?.focus())
+  }
+
+  async function deleteOperatorVoice() {
+    setRemovingOperatorVoice(true)
+    setOperatorVoiceError('')
+    try {
+      await removeOperatorVoice(operatorVoiceScope)
+      setOperatorVoiceSample(null)
+    } catch {
+      setOperatorVoiceError('저장한 음성을 삭제하지 못했어요. 다시 시도해 주세요.')
+    } finally {
+      setRemovingOperatorVoice(false)
+    }
   }
 
   const progressText = {
@@ -626,6 +665,30 @@ function App({ onSignOut } = {}) {
                 </>
               ) : (
                 <>
+                  <div className="operator-voice-panel">
+                    <div>
+                      <strong>상담원 음성</strong>
+                      <p role="status">
+                        {operatorVoiceSample === undefined ? '저장한 음성을 확인하고 있어요.'
+                          : operatorVoiceSample && config.operator_voice_sample_supported ? '저장됨 · 실시간 화자 분류에 자동 적용'
+                            : operatorVoiceSample ? '저장됨 · 현재 연결된 서버에서 적용할 수 없어요.'
+                              : '실시간 분석 전에 상담원 목소리를 등록할 수 있어요.'}
+                      </p>
+                      {operatorVoiceError && <p className="operator-voice-error" role="alert">{operatorVoiceError}</p>}
+                    </div>
+                    <div className="operator-voice-actions">
+                      {operatorVoiceSample && (
+                        <button type="button" className="button secondary-button" onClick={deleteOperatorVoice}
+                          disabled={busy || removingOperatorVoice}>음성 삭제</button>
+                      )}
+                      <button ref={operatorVoiceTrigger} type="button" className="button secondary-button"
+                        disabled={busy || removingOperatorVoice || operatorVoiceSample === undefined ||
+                          connection !== 'online' || !config.operator_voice_sample_supported}
+                        onClick={() => { setOperatorVoiceError(''); setOperatorVoiceOpen(true) }}>
+                        <Icon name="mic" size={15} /> {operatorVoiceSample ? '상담원 음성 다시 등록' : '상담원 음성 등록'}
+                      </button>
+                    </div>
+                  </div>
                   <div className={`record-zone ${recording ? 'recording' : ''}`}>
                     <span className="record-mic">
                       <Icon name="mic" size={24} />
@@ -679,7 +742,8 @@ function App({ onSignOut } = {}) {
                       </button>
                     ) : (
                       <button className="button primary-button" onClick={() => beginRecording()}
-                        disabled={busy || (recordingSource === 'file' && (!file || durationExceeded))}>
+                        disabled={busy || removingOperatorVoice || operatorVoiceSample === undefined ||
+                          (recordingSource === 'file' && (!file || durationExceeded))}>
                         <Icon name="mic" size={15} />
                         실시간 분석 시작
                       </button>
@@ -831,6 +895,12 @@ function App({ onSignOut } = {}) {
         </div>
       </div>
 
+      {operatorVoiceOpen && (
+        <OperatorVoiceDialog scope={operatorVoiceScope} onClose={closeOperatorVoice} onSaved={(sample) => {
+          setOperatorVoiceSample(sample)
+          closeOperatorVoice()
+        }} />
+      )}
       <dialog
         ref={guideDialog}
         className="guide-dialog"

@@ -7,7 +7,7 @@ import GoogleSignIn from './GoogleSignIn.jsx'
 const clientId = import.meta.env?.GOOGLE_CLIENT_ID
 
 export default function AuthenticatedApp() {
-  const [signedIn, setSignedIn] = useState(false)
+  const [accountScope, setAccountScope] = useState(null)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
   const attempt = useRef(null)
@@ -21,8 +21,11 @@ export default function AuthenticatedApp() {
     try {
       await verifySession(credential, pending.signal)
       if (pending.signal.aborted) return
+      const payload = credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+      const subject = JSON.parse(atob(payload)).sub
+      if (typeof subject !== 'string' || !subject) throw new Error('Google 계정 정보를 확인하지 못했어요.')
       setAuthToken(credential)
-      setSignedIn(true)
+      setAccountScope(`google:${subject}`)
     } catch (error) {
       if (!pending.signal.aborted) setError(error.message)
     } finally {
@@ -31,11 +34,11 @@ export default function AuthenticatedApp() {
   }, [])
 
   if (!clientId) return <App />
-  if (signedIn) {
-    return <App onSignOut={() => {
+  if (accountScope) {
+    return <App operatorVoiceScope={accountScope} onSignOut={() => {
       setAuthToken('')
       window.google?.accounts?.id?.disableAutoSelect()
-      setSignedIn(false)
+      setAccountScope(null)
     }} />
   }
   return (

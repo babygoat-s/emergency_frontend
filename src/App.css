@@ -491,6 +491,7 @@
 }
 .dropzone,
 .record-zone,
+.operator-voice-panel,
 .input-bottom,
 .manual-text-input,
 .operation-status,
@@ -1587,6 +1588,57 @@
 .guide-dialog > p {
   font-size: 12px;
   line-height: 1.8;
+}
+.operator-voice-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #121318;
+}
+.operator-voice-panel strong {
+  font-size: 12px;
+}
+.operator-voice-panel p,
+.operator-voice-status {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.operator-voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.operator-voice-dialog .operator-voice-actions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.operator-voice-sentences {
+  margin: 14px 0;
+  padding: 12px 12px 12px 32px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  line-height: 1.8;
+}
+.operator-voice-sentences li + li {
+  margin-top: 4px;
+}
+.operator-voice-dialog audio {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.operator-voice-panel p.operator-voice-error,
+.operator-voice-dialog p.operator-voice-error {
+  color: var(--danger);
+  margin-top: 6px;
 }
 .guide-steps {
   list-style: none;
