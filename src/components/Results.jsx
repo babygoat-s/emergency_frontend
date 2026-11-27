@@ -97,7 +97,6 @@ export default function Results({ result, streamState, operation, symptomCount =
   const processingTitle = {
     recording: '통화 음성을 수신하고 있습니다',
     connecting: '마이크 연결을 준비하고 있습니다',
-    registering: '상담원 음성을 등록하고 있습니다',
     finishing: '마지막 발화를 처리하고 있습니다',
     text: '상담 내용을 확인하고 있습니다',
     example: '예시 결과를 불러오고 있습니다',

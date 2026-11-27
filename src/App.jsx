@@ -6,6 +6,8 @@ import { RESEARCH_NOTICE } from './lib/manuals'
 import Icon from './components/Icon'
 import Results from './components/Results'
 import AudioPlayer from './components/AudioPlayer'
+import OperatorVoiceDialog from './components/OperatorVoiceDialog'
+import { loadOperatorVoice, removeOperatorVoice } from './lib/operator-voice-storage'
 import ThemeSwitch from './components/ThemeSwitch'
 import './App.css'
 
@@ -31,16 +33,13 @@ function Waveform({ level, active }) {
   )
 }
 
-function App({ onSignOut } = {}) {
+function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
   const [config, setConfig] = useState(DEFAULT_CONFIG)
   const [connection, setConnection] = useState('checking')
   const [mode, setMode] = useState('upload')
   const [language, setLanguage] = useState('ko')
   const [file, setFile] = useState(null)
   const [recordingSource, setRecordingSource] = useState('microphone')
-  const [useOperatorVoice, setUseOperatorVoice] = useState(true)
-  const [sampleInfo, setSampleInfo] = useState(null)
-  const [sampleSeconds, setSampleSeconds] = useState(0)
   const [audioUrl, setAudioUrl] = useState('')
   const [duration, setDuration] = useState(null)
   const [dragging, setDragging] = useState(false)
@@ -52,16 +51,19 @@ function App({ onSignOut } = {}) {
   const [seconds, setSeconds] = useState(0)
   const [level, setLevel] = useState(0)
   const [guideOpen, setGuideOpen] = useState(false)
+  const [operatorVoiceSample, setOperatorVoiceSample] = useState(undefined)
+  const [operatorVoiceOpen, setOperatorVoiceOpen] = useState(false)
+  const [operatorVoiceError, setOperatorVoiceError] = useState('')
+  const [removingOperatorVoice, setRemovingOperatorVoice] = useState(false)
   const fileInput = useRef(null)
   const operationRef = useRef(null)
   const startedAt = useRef(0)
-  const sampleStartedAt = useRef(0)
   const connectionRequest = useRef(null)
   const guideDialog = useRef(null)
   const guideTrigger = useRef(null)
+  const operatorVoiceTrigger = useRef(null)
   const busy = operation !== 'idle'
   const recording = operation === 'recording'
-  const registering = operation === 'registering'
   const durationExceeded =
     duration != null && Number.isFinite(duration) && duration > config.max_audio_seconds
 
@@ -82,6 +84,19 @@ function App({ onSignOut } = {}) {
       operationRef.current?.session?.cancel()
     }
   }, [updateConnection])
+
+  useEffect(() => {
+    let active = true
+    loadOperatorVoice(operatorVoiceScope).then((sample) => {
+      if (active) setOperatorVoiceSample(sample)
+    }).catch(() => {
+      if (active) {
+        setOperatorVoiceSample(null)
+        setOperatorVoiceError('이 브라우저의 음성 저장소를 열지 못했어요.')
+      }
+    })
+    return () => { active = false }
+  }, [operatorVoiceScope])
 
   useEffect(() => {
     if (!file) return
@@ -134,17 +149,6 @@ function App({ onSignOut } = {}) {
     return () => clearInterval(timer)
   }, [recording, config.max_audio_seconds, stopRecording])
 
-  useEffect(() => {
-    if (!registering) return
-    const timer = setInterval(() => {
-      const elapsed = (Date.now() - sampleStartedAt.current) / 1000
-      setSampleSeconds(elapsed)
-      // The server rejects samples over its limit, so stop a little before it.
-      if (sampleInfo && elapsed >= sampleInfo.max - 1) operationRef.current?.finishSample?.()
-    }, 250)
-    return () => clearInterval(timer)
-  }, [registering, sampleInfo])
-
   function refreshConnection() {
     connectionRequest.current?.abort()
     const controller = new AbortController()
@@ -164,10 +168,6 @@ function App({ onSignOut } = {}) {
     setDuration(null)
     setResult(null)
     setStreamState(EMPTY_STREAM)
-  }
-
-  function finishSample() {
-    operationRef.current?.finishSample?.()
   }
 
   function cancelOperation() {
@@ -237,22 +237,7 @@ function App({ onSignOut } = {}) {
       const session = await startRealtime({
         language,
         sourceType,
-        operatorSample: config.operator_voice_sample_supported && useOperatorVoice
-          ? {
-              onRequired: (info, finish) => {
-                if (operationRef.current !== current) return
-                current.finishSample = finish
-                sampleStartedAt.current = Date.now()
-                setSampleSeconds(0)
-                setSampleInfo({
-                  sentences: Array.isArray(info.sentences) ? info.sentences.slice(0, 5) : [],
-                  min: Number(info.min_speech_seconds) || 4,
-                  max: Number(info.max_sample_seconds) || 20,
-                })
-                setOperation('registering')
-              },
-            }
-          : null,
+        operatorVoiceSample: config.operator_voice_sample_supported ? operatorVoiceSample : null,
         maxDurationSeconds: config.max_audio_seconds,
         onRecordingReady: (blob) => {
           if (operationRef.current !== current) return
@@ -309,11 +294,28 @@ function App({ onSignOut } = {}) {
     setGuideOpen(true)
   }
 
+  function closeOperatorVoice() {
+    setOperatorVoiceOpen(false)
+    requestAnimationFrame(() => operatorVoiceTrigger.current?.focus())
+  }
+
+  async function deleteOperatorVoice() {
+    setRemovingOperatorVoice(true)
+    setOperatorVoiceError('')
+    try {
+      await removeOperatorVoice(operatorVoiceScope)
+      setOperatorVoiceSample(null)
+    } catch {
+      setOperatorVoiceError('저장한 음성을 삭제하지 못했어요. 다시 시도해 주세요.')
+    } finally {
+      setRemovingOperatorVoice(false)
+    }
+  }
+
   const progressText = {
     file: '음성 파일을 분석하고 있어요',
     example: '예시를 불러오고 있어요',
     connecting: '음성 입력과 서버를 연결하고 있어요',
-    registering: '상담원 음성을 등록하고 있어요',
     recording: '실시간으로 음성을 분석하고 있어요',
     finishing: reviewingAudio ? '반복 응답 구간의 원음을 다시 인식하고 있어요' : '마지막 음성의 분석을 마무리하고 있어요',
   }[operation]
@@ -569,7 +571,31 @@ function App({ onSignOut } = {}) {
                 </>
               ) : (
                 <>
-                  <div className={`record-zone ${recording || registering ? 'recording' : ''}`}>
+                  <div className="operator-voice-panel">
+                    <div>
+                      <strong>상담원 음성</strong>
+                      <p role="status">
+                        {operatorVoiceSample === undefined ? '저장한 음성을 확인하고 있어요.'
+                          : operatorVoiceSample && config.operator_voice_sample_supported ? '저장됨 · 실시간 화자 분류에 자동 적용'
+                            : operatorVoiceSample ? '저장됨 · 현재 연결된 서버에서 적용할 수 없어요.'
+                              : '실시간 분석 전에 상담원 목소리를 등록할 수 있어요.'}
+                      </p>
+                      {operatorVoiceError && <p className="operator-voice-error" role="alert">{operatorVoiceError}</p>}
+                    </div>
+                    <div className="operator-voice-actions">
+                      {operatorVoiceSample && (
+                        <button type="button" className="button secondary-button" onClick={deleteOperatorVoice}
+                          disabled={busy || removingOperatorVoice}>음성 삭제</button>
+                      )}
+                      <button ref={operatorVoiceTrigger} type="button" className="button secondary-button"
+                        disabled={busy || removingOperatorVoice || operatorVoiceSample === undefined ||
+                          connection !== 'online' || !config.operator_voice_sample_supported}
+                        onClick={() => { setOperatorVoiceError(''); setOperatorVoiceOpen(true) }}>
+                        <Icon name="mic" size={15} /> {operatorVoiceSample ? '상담원 음성 다시 등록' : '상담원 음성 등록'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className={`record-zone ${recording ? 'recording' : ''}`}>
                     <span className="record-mic">
                       <Icon name="mic" size={24} />
                     </span>
@@ -577,9 +603,7 @@ function App({ onSignOut } = {}) {
                       <h3>
                         {recording
                           ? '신고 통화 녹음 중'
-                          : registering
-                            ? '상담원 음성 등록'
-                            : operation === 'connecting'
+                          : operation === 'connecting'
                             ? '음성 입력 연결 중'
                             : operation === 'finishing'
                               ? '마지막 발화 처리 중'
@@ -588,27 +612,18 @@ function App({ onSignOut } = {}) {
                       <p>
                         {recording
                           ? '발화가 인식되면 전사와 분석 결과가 순차적으로 표시됩니다.'
-                          : registering
-                            ? `상담원 한 분이 아래 문장을 또박또박 읽어 주세요. 최소 ${sampleInfo?.min ?? 4}초 이상 필요하며, 등록한 음성은 화자 구분에만 쓰이고 이 통화에서만 사용됩니다.`
-                            : recordingSource === 'system'
+                          : recordingSource === 'system'
                             ? '선택한 PC 소리만 입력합니다. 오디오 공유를 선택하세요. 화면 영상은 전송하지 않습니다.'
                             : '현장 대화는 마이크로, PC 통화는 통화 오디오로 분석해 주세요.'}
                       </p>
                     </div>
-                    <Waveform level={level} active={recording || registering} />
+                    <Waveform level={level} active={recording} />
                     <div className="record-timer">
                       <span className={recording ? 'record-dot' : 'timer-dot'} />
-                      {registering ? formatTime(Math.floor(sampleSeconds)) : formatTime(seconds)}
-                      <small>/ {formatTime(registering ? sampleInfo?.max ?? 20 : config.max_audio_seconds)}</small>
+                      {formatTime(seconds)}
+                      <small>/ {formatTime(config.max_audio_seconds)}</small>
                     </div>
                   </div>
-                  {registering && sampleInfo?.sentences.length > 0 && (
-                    <ol className="voice-sample-list" aria-label="상담원 음성 등록 문장">
-                      {sampleInfo.sentences.map((sentence) => (
-                        <li key={sentence}>{sentence}</li>
-                      ))}
-                    </ol>
-                  )}
                   <div className="input-bottom">
                     <span className="input-hint">
                       <Icon name="radio" size={14} />
@@ -617,27 +632,8 @@ function App({ onSignOut } = {}) {
                         <option value="microphone">마이크</option>
                         <option value="system">PC·통화 오디오</option>
                       </select>
-                      {config.operator_voice_sample_supported && (
-                        <label className="voice-sample-toggle">
-                          <input type="checkbox" checked={useOperatorVoice} disabled={busy}
-                            onChange={(event) => setUseOperatorVoice(event.target.checked)} />
-                          상담원 음성 등록
-                        </label>
-                      )}
                     </span>
-                    {registering ? (
-                      <span className="input-actions">
-                        <button className="button secondary-button" onClick={cancelOperation}>
-                          취소
-                          <Icon name="close" size={15} />
-                        </button>
-                        <button className="button primary-button" onClick={finishSample}
-                          disabled={sampleSeconds < (sampleInfo?.min ?? 4) + 1}>
-                          등록 완료
-                          <Icon name="arrow" size={15} />
-                        </button>
-                      </span>
-                    ) : recording ? (
+                    {recording ? (
                       <button className="button stop-button" onClick={stopRecording}>
                         <Icon name="stop" size={14} />
                         녹음 종료
@@ -649,7 +645,7 @@ function App({ onSignOut } = {}) {
                       </button>
                     ) : (
                       <button className="button primary-button" onClick={() => beginRecording()}
-                        disabled={busy}>
+                        disabled={busy || removingOperatorVoice || operatorVoiceSample === undefined}>
                         <Icon name="mic" size={15} />
                         실시간 분석 시작
                       </button>
@@ -800,6 +796,12 @@ function App({ onSignOut } = {}) {
         </div>
       </div>
 
+      {operatorVoiceOpen && (
+        <OperatorVoiceDialog scope={operatorVoiceScope} onClose={closeOperatorVoice} onSaved={(sample) => {
+          setOperatorVoiceSample(sample)
+          closeOperatorVoice()
+        }} />
+      )}
       <dialog
         ref={guideDialog}
         className="guide-dialog"

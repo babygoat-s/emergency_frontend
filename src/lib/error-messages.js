@@ -22,11 +22,12 @@ const messages = {
   TRANSCRIPT_TOO_LONG: '분석할 내용이 너무 길어요. 더 짧은 음성으로 다시 시도해 주세요.',
   FRAME_TOO_LARGE: '음성 전송 중 문제가 발생했어요. 다시 녹음해 주세요.',
   INVALID_PCM: '음성 전송 중 문제가 발생했어요. 다시 녹음해 주세요.',
-  OPERATOR_VOICE_UNAVAILABLE: '상담원 음성 등록을 지원하지 않아요. 등록 없이 시작해 주세요.',
-  OPERATOR_VOICE_TOO_SHORT: '상담원 음성이 충분하지 않아요. 안내 문장을 4초 이상 또박또박 읽어 주세요.',
-  OPERATOR_VOICE_TOO_LONG: '상담원 음성 등록이 너무 길어요. 20초 이내로 읽어 주세요.',
-  OPERATOR_VOICE_INCONSISTENT: '등록한 음성이 한 사람의 목소리로 확인되지 않았어요. 한 명이 다시 읽어 주세요.',
   INVALID_STREAM_MESSAGE: '음성 연결 중 문제가 발생했어요. 다시 녹음해 주세요.',
+  OPERATOR_VOICE_TOO_SHORT: '안내 문장을 읽어 실제 목소리가 4초 이상 들리도록 다시 녹음해 주세요.',
+  OPERATOR_VOICE_TOO_LONG: '상담원 음성 샘플은 최대 20초까지 녹음할 수 있어요.',
+  OPERATOR_VOICE_INCONSISTENT: '조용한 곳에서 한 사람의 목소리로 다시 녹음해 주세요.',
+  OPERATOR_VOICE_UNAVAILABLE: '연결된 서버가 상담원 음성 등록을 지원하지 않아요.',
+  SPEAKER_MODEL_UNAVAILABLE: '화자 분류 모델을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
 }
 
 // Only fixed local text reaches the screen; never render a server's message.

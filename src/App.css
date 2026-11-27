@@ -492,6 +492,7 @@
 }
 .dropzone,
 .record-zone,
+.operator-voice-panel,
 .input-bottom,
 .operation-status,
 .validation-note,
@@ -1403,6 +1404,57 @@
   font-size: 14px;
   line-height: 1.8;
 }
+.operator-voice-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel-alt);
+}
+.operator-voice-panel strong {
+  font-size: 12px;
+}
+.operator-voice-panel p,
+.operator-voice-status {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.operator-voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.operator-voice-dialog .operator-voice-actions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.operator-voice-sentences {
+  margin: 14px 0;
+  padding: 12px 12px 12px 32px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  line-height: 1.8;
+}
+.operator-voice-sentences li + li {
+  margin-top: 4px;
+}
+.operator-voice-dialog audio {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.operator-voice-panel p.operator-voice-error,
+.operator-voice-dialog p.operator-voice-error {
+  color: var(--danger);
+  margin-top: 6px;
+}
 .guide-steps {
   list-style: none;
   display: grid;
@@ -2072,8 +2124,3 @@
   border-style: dashed;
   background: var(--surface-3);
 }
-
-.voice-sample-toggle { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; font-size: 13px; color: var(--text-2); cursor: pointer; }
-.voice-sample-toggle input { accent-color: var(--primary); }
-.voice-sample-list { margin: 12px 0 0; padding: 14px 18px 14px 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-alt); color: var(--text); font-size: 15px; line-height: 2; }
-.input-actions { display: inline-flex; gap: 10px; align-items: center; }
