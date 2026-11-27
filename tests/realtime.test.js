@@ -21,11 +21,13 @@ function setup(t, { permission, onSend, displayPermission, sampleError } = {}) {
       if (typeof message === 'string') {
         const event = JSON.parse(message)
         if (event.type === 'start') queueMicrotask(() => this.onmessage?.({ data: JSON.stringify(
-          event.operator_voice_sample ? { type: 'operator_voice_sample_required', max_frame_bytes: 32000 } : { type: 'ready' },
-        ) }))
-        if (event.type === 'operator_voice_sample_end') queueMicrotask(() => this.onmessage?.({ data: JSON.stringify(
-          sampleError ? { type: 'error', error: { code: sampleError } } : { type: 'ready' },
-        ) }))
+          event.operator_voice_sample
+            ? { type: 'operator_voice_sample_required', max_frame_bytes: 32000 }
+            : { type: 'ready' }) }))
+        if (event.type === 'operator_voice_sample_end') queueMicrotask(() => {
+          if (sampleError) this.onmessage?.({ data: JSON.stringify({ type: 'error', error: { code: sampleError, message: 'internal detail' } }) })
+          else this.onmessage?.({ data: JSON.stringify({ type: 'ready' }) })
+        })
         if (event.type === 'finish') queueMicrotask(() => {
           if (onSend) onSend(this)
           else this.onmessage?.({ data: JSON.stringify({ type: 'finished' }) })
@@ -214,4 +216,21 @@ test('sharing without an audio track fails before opening a WebSocket', async (t
     onEvent() {}, onLevel() {} }), { code: 'MIC_UNAVAILABLE' })
   assert.equal(stopped, true)
   assert.equal(state.socket, undefined)
+})
+
+test('operator voice sample errors show fixed local messages and release the microphone', async (t) => {
+  const { state } = setup(t, { sampleError: 'OPERATOR_VOICE_TOO_SHORT' })
+  await assert.rejects(startRealtime({ language: 'ko', operatorVoiceSample: new ArrayBuffer(128000),
+    onEvent() {}, onError() {}, onLevel() {} }), { code: 'OPERATOR_VOICE_TOO_SHORT', message: /4초 이상/ })
+  assert.equal(state.stoppedTracks, 1)
+  assert.equal(state.closedContexts, 1)
+  assert.equal(state.node, undefined)
+})
+
+test('a file source never requests operator voice registration', async (t) => {
+  const { state } = setup(t)
+  const session = await startRealtime({ language: 'ko', sourceType: 'file', file: new Blob(['x']), operatorVoiceSample: new ArrayBuffer(128000),
+    onEvent() {}, onError() {}, onLevel() {} })
+  assert.equal('operator_voice_sample' in JSON.parse(state.messages[0]), false)
+  await session.stop()
 })

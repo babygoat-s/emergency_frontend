@@ -66,7 +66,7 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
         throw new ApiError('허용된 음성 길이를 초과했습니다.', 'AUDIO_TOO_LONG')
     } else if (sourceType === 'system') {
       if (!navigator.mediaDevices?.getDisplayMedia)
-        throw new ApiError('통화 오디오 공유를 지원하지 않아요. 파일 직접 입력을 사용해 주세요.', 'MIC_UNSUPPORTED')
+        throw new ApiError('통화 오디오 공유를 지원하지 않아요. 파일 업로드를 사용해 주세요.', 'MIC_UNSUPPORTED')
       stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: {
         echoCancellation: false, noiseSuppression: false, autoGainControl: false,
       } })
@@ -82,7 +82,9 @@ export async function startRealtime({ language, signal, onEvent, onError, onLeve
     assertActive()
 
     socket = createRealtimeSocket()
-    await waitForRealtimeReady(socket, { language, signal, operatorVoiceSample })
+    await waitForRealtimeReady(socket, {
+      language, signal, operatorVoiceSample: sourceType === 'file' ? null : operatorVoiceSample,
+    })
     assertActive()
     socket.onclose = () => {
       if (!finished && !stopped) fail(new ApiError('음성 연결이 끊겼어요. 다시 녹음해 주세요.', 'WS_CLOSED'))

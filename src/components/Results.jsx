@@ -4,24 +4,7 @@ import ManualQuestions from './ManualQuestions'
 import { formatTime, selectQuestions, selectManualResult } from '../lib/results'
 import { formatManualSource, isResearchNotice, questionSources } from '../lib/manuals'
 
-const urgencyLabels = { minimal: '최하', low: '하', moderate: '중', high: '상', critical: '최상' }
 const speakerLabels = { caller: '신고자', operator: '접수 담당자', unknown: '화자 미확인' }
-
-export function UrgencyScale() {
-  return (
-    <section className="urgency-scale" aria-labelledby="urgency-scale-title">
-      <h3 id="urgency-scale-title">긴급도 5단계</h3>
-      <ol aria-label="낮은 긴급도부터 높은 긴급도까지">
-        {Object.entries(urgencyLabels).map(([level, label]) => (
-          <li key={level} className={`badge urgency-${level}`}>
-            {label}
-          </li>
-        ))}
-      </ol>
-      <p>최상에 가까울수록 더 긴급해요. 판단에 필요한 정보가 부족하면 ‘판단 보류’로 표시해요.</p>
-    </section>
-  )
-}
 
 export default function Results({ result, streamState, operation, symptomCount = 0, llmEnabled = true }) {
   const data = result || streamState.data
@@ -32,23 +15,10 @@ export default function Results({ result, streamState, operation, symptomCount =
   const previousSummary = !result && !ragSummary ? streamState.lastSummary?.text : null
   const summary = data?.rag ? (ragSummary || previousSummary) : analysis?.summary
   const summaryUnavailable = ['unavailable', 'disabled'].includes(data?.rag?.summary_provider)
-  const ragUrgency = data?.rag?.urgency
-  const llmUrgency = ragUrgency?.origin === 'llm' ? ragUrgency : null
-  const previousUrgency = !result && !data?.rag?.requires_immediate_operator_review &&
-    !llmUrgency && streamState.lastUrgency
-  const urgencyResult = data?.rag ? llmUrgency || previousUrgency : analysis?.urgency
-  const pendingUrgencyReason = ragUrgency?.origin === 'unavailable' ? ragUrgency.reason : null
   const warnings = (data?.warnings || []).filter((warning) => !isResearchNotice(warning))
   const manualResult = selectManualResult(result, streamState)
   const latestSpeechSequence = streamState.localQuestionSequence || streamState.transcriptSequence
   const stale = !result && streamState.analysisSequence < latestSpeechSequence && analysis
-  const urgencyLevel = urgencyResult?.level
-  const urgencyClass = Object.hasOwn(urgencyLabels, urgencyLevel) ? urgencyLevel : 'unknown'
-  const urgency = urgencyLabels[urgencyClass] || (
-    urgencyResult ? '판단 보류' : data?.rag?.llm_status === 'unavailable' ||
-      data?.rag?.llm_status === 'partial' || data?.rag?.llm_status === 'not_configured'
-      ? '분석 미완료' : '분석 대기'
-  )
   const symptoms = data?.symptoms || analysis?.symptoms || []
   const segments = data?.transcript?.segments || []
   const transcriptBox = useRef(null)
@@ -85,7 +55,6 @@ export default function Results({ result, streamState, operation, symptomCount =
       ...(symptoms.length
         ? symptoms.map((item) => `- ${item.label}${item.evidence ? `: ${item.evidence}` : ''}`)
         : [symptomStatus]),
-      ...(llmEnabled ? ['\n[긴급도]', `${urgency}${urgencyResult?.reason ? `: ${urgencyResult.reason}` : ''}`] : []),
       local ? '\n[기본 확인 질문]' : '\n[확인 질문]',
       ...(!data.rag ? questions.map((item) => `- ${item.question} (${item.purpose})`) : []),
       ...(data.rag
@@ -119,7 +88,7 @@ export default function Results({ result, streamState, operation, symptomCount =
     unavailable: '결과 검토 필요',
     pending: '부분 결과',
     no_speech: '발화 대기',
-  }[data?.status] || '입력 대기'
+  }[data?.status] || null
   const phase = busy
     ? operation === 'recording'
       ? '실시간 분석'
@@ -132,7 +101,6 @@ export default function Results({ result, streamState, operation, symptomCount =
     text: '상담 내용을 확인하고 있습니다',
     example: '예시 결과를 불러오고 있습니다',
   }[operation] || '음성을 텍스트로 변환하고 있습니다'
-  const urgencyIndex = Object.keys(urgencyLabels).indexOf(urgencyClass)
 
   return (
     <section
@@ -144,10 +112,12 @@ export default function Results({ result, streamState, operation, symptomCount =
       <div className="results-toolbar">
         <div className="section-title">
           <h2 id="results-title">분석 결과</h2>
-          <span className={`badge ${busy ? 'processing-badge' : data?.status === 'completed' ? 'complete-badge' : 'neutral-badge'}`}>
-            <span className="status-dot" />
-            {phase}
-          </span>
+          {phase && (
+            <span className={`badge ${busy ? 'processing-badge' : data?.status === 'completed' ? 'complete-badge' : 'neutral-badge'}`}>
+              <span className="status-dot" />
+              {phase}
+            </span>
+          )}
         </div>
         <div className="result-actions">
           {data?.is_demo && <span className="badge demo-badge">고정 예시</span>}
@@ -306,44 +276,6 @@ export default function Results({ result, streamState, operation, symptomCount =
                     : '대화가 입력되면 LLM이 환자 상태와 신고 내용을 요약합니다.')}
               </p>
               {previousSummary && <p className="manual-note">최신 발화의 요약이 준비되면 갱신합니다.</p>}
-            </div>
-          </section>
-          <section className={`card analysis-card urgency-${urgencyClass}`} aria-labelledby="urgency-title">
-            <div className="panel-heading">
-              <div className="section-title">
-                <Icon name="pulse" size={17} />
-                <h3 id="urgency-title">긴급도</h3>
-              </div>
-              <span className="panel-meta">
-                {urgencyResult?.origin === 'llm' ? 'LLM 검토 제안' : '담당자 검토용'}
-              </span>
-            </div>
-            <div className="urgency-body">
-              <div className="urgency-value">긴급도 - {urgency}</div>
-              {data?.rag?.requires_immediate_operator_review && (
-                <p className="immediate-review">
-                  <Icon name="alert" size={15} />
-                  즉시 상담원 확인 필요
-                </p>
-              )}
-              <ol className="urgency-meter" aria-label="긴급도 5단계">
-                {Object.entries(urgencyLabels).map(([level, label], index) => (
-                  <li
-                    key={level}
-                    className={urgencyIndex >= index ? `active urgency-${level}` : ''}
-                    aria-current={urgencyClass === level ? 'step' : undefined}
-                  >
-                    <span />
-                    <small>{label}</small>
-                  </li>
-                ))}
-              </ol>
-              <p className="urgency-reason">
-                {urgencyResult?.reason || pendingUrgencyReason ||
-                  (busy
-                    ? '환자 상태와 상담 내용을 확인하고 있습니다.'
-                    : 'LLM이 대화 내용을 분석하면 표시합니다.')}
-              </p>
             </div>
           </section>
           </>}

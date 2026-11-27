@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { analyzeFile, analyzeText, DEFAULT_CONFIG, getConfig, getExample, getHealth } from './api/analysis'
+import { analyzeFile, DEFAULT_CONFIG, getConfig, getExample, getHealth } from './api/analysis'
 import { startRealtime } from './audio/realtime'
 import { EMPTY_STREAM, formatTime, mergeStreamEvent, validateFile } from './lib/results'
 import { RESEARCH_NOTICE } from './lib/manuals'
 import Icon from './components/Icon'
-import Results, { UrgencyScale } from './components/Results'
+import Results from './components/Results'
 import AudioPlayer from './components/AudioPlayer'
 import OperatorVoiceDialog from './components/OperatorVoiceDialog'
 import { loadOperatorVoice, removeOperatorVoice } from './lib/operator-voice-storage'
+import ThemeSwitch from './components/ThemeSwitch'
 import './App.css'
 
 const languageNames = { ko: '한국어', en: '영어', ja: '일본어', auto: '자동 감지' }
@@ -37,7 +38,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
   const [connection, setConnection] = useState('checking')
   const [mode, setMode] = useState('upload')
   const [language, setLanguage] = useState('ko')
-  const [conversation, setConversation] = useState('')
   const [file, setFile] = useState(null)
   const [recordingSource, setRecordingSource] = useState('microphone')
   const [audioUrl, setAudioUrl] = useState('')
@@ -201,7 +201,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
     try {
       let response
       if (kind === 'example') response = await getExample(controller.signal)
-      else if (kind === 'text') response = await analyzeText(conversation, controller.signal, config.llm_features_enabled)
       else response = await analyzeFile(file, language, controller.signal)
       if (controller.signal.aborted) return
       setResult(response)
@@ -239,7 +238,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
         language,
         sourceType,
         operatorVoiceSample: config.operator_voice_sample_supported ? operatorVoiceSample : null,
-        file: sourceType === 'file' ? file : null,
         maxDurationSeconds: config.max_audio_seconds,
         onRecordingReady: (blob) => {
           if (operationRef.current !== current) return
@@ -315,7 +313,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
   }
 
   const progressText = {
-    text: '매뉴얼에서 다음 질문을 찾고 있어요',
     file: '음성 파일을 분석하고 있어요',
     example: '예시를 불러오고 있어요',
     connecting: '음성 입력과 서버를 연결하고 있어요',
@@ -360,28 +357,8 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
               <span>사용 안내</span>
             </button>
           </nav>
-          <div className="sidebar-workflow">
-            <span className="nav-label">상담 분석 절차</span>
-            <div>
-              <span>01</span>음성 또는 대화 입력
-            </div>
-            <div>
-              <span>02</span>전사 및 증상 확인
-            </div>
-            <div>
-              <span>03</span>후속 질문 검토
-            </div>
-          </div>
           <div className="sidebar-bottom">
-            <span className="environment-label">
-              <span className="status-dot" />
-              연구용 프로토타입
-            </span>
-            <p>
-              분석 결과와 매뉴얼 근거는
-              <br />
-              담당자의 검토가 필요합니다.
-            </p>
+            <ThemeSwitch />
             <span className="sidebar-version">119 상담 의사결정 지원</span>
           </div>
         </aside>
@@ -421,19 +398,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                 <h1>신고 음성 분석</h1>
                 <p>통화 전사와 환자 상태를 확인하고, 다음 상담 질문을 검토합니다.</p>
               </div>
-              <div className="page-actions">
-                <button
-                  className="button secondary-button"
-                  disabled={busy}
-                  onClick={() => runAnalysis('example')}
-                >
-                  <Icon name="play" size={15} />
-                  예시 불러오기
-                </button>
-                <button className="icon-button guide-trigger" onClick={openGuide} aria-label="사용 안내">
-                  <Icon name="help" />
-                </button>
-              </div>
             </div>
             {connection === 'offline' && (
               <div className="connection-notice" role="status">
@@ -451,15 +415,11 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                   <Icon name="wave" size={17} />
                   <h2 id="input-title">상담 입력</h2>
                 </div>
-                <span className={`badge ${recording ? 'recording-badge' : 'neutral-badge'}`}>
-                  {recording
-                    ? '녹음 중'
-                    : busy
-                      ? '처리 중'
-                      : file && mode === 'upload'
-                        ? '파일 준비됨'
-                        : '입력 대기'}
-                </span>
+                {(busy || (file && mode === 'upload')) && (
+                  <span className={`badge ${recording ? 'recording-badge' : 'neutral-badge'}`}>
+                    {recording ? '녹음 중' : busy ? '처리 중' : '파일 준비됨'}
+                  </span>
+                )}
               </div>
               <div className="input-controls">
                 <div className="mode-switch" role="group" aria-label="상담 입력 방식">
@@ -487,18 +447,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                     <Icon name="mic" size={16} />
                     실시간 녹음
                   </button>
-                  <button
-                    className={mode === 'text' ? 'active' : ''}
-                    aria-pressed={mode === 'text'}
-                    disabled={busy}
-                    onClick={() => {
-                      setMode('text')
-                      setError(null)
-                    }}
-                  >
-                    <Icon name="fileText" size={16} />
-                    대화 입력
-                  </button>
                 </div>
                 <label className="language-select">
                   <Icon name="globe" size={14} />
@@ -516,41 +464,7 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                   </select>
                 </label>
               </div>
-              {mode === 'text' ? (
-                <div className="manual-text-input">
-                  <label htmlFor="conversation-text">지금까지의 상담 대화</label>
-                  <textarea
-                    id="conversation-text"
-                    value={conversation}
-                    onChange={(event) => setConversation(event.target.value)}
-                    maxLength={20000}
-                    disabled={busy}
-                    placeholder={
-                      '신고자: 어머니가 머리가 아프고 토한다고 해요.\n상담원: 의식이 있습니까?\n신고자: 네, 의식은 또렷해요.'
-                    }
-                  />
-                  <div className="input-bottom">
-                    <span className="input-hint">
-                      화자를 구분해 입력한 뒤, 대화가 추가되면 다시 추천받을 수 있습니다.
-                    </span>
-                    {busy ? (
-                      <button className="button secondary-button" onClick={cancelOperation}>
-                        취소
-                        <Icon name="close" size={15} />
-                      </button>
-                    ) : (
-                      <button
-                        className="button primary-button"
-                        disabled={!conversation.trim()}
-                        onClick={() => runAnalysis('text')}
-                      >
-                        후속 질문 추천
-                        <Icon name="arrow" size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : mode === 'upload' ? (
+              {mode === 'upload' ? (
                 <>
                   <input
                     ref={fileInput}
@@ -601,13 +515,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                             <Icon name="checkCircle" size={14} />
                             준비됨
                           </span>
-                          <button
-                            className="button secondary-button"
-                            disabled={busy}
-                            onClick={() => fileInput.current?.click()}
-                          >
-                            파일 변경
-                          </button>
                         </div>
                         {audioUrl && <AudioPlayer key={audioUrl} src={audioUrl} onDuration={setDuration} />}
                       </div>
@@ -620,17 +527,10 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                           <h3>신고 통화 파일을 여기에 놓으세요</h3>
                           <p>
                             {config.supported_audio_formats.map((item) => item.toUpperCase()).join(', ')} ·
-                            최대 {config.max_upload_mb} MB
+                            최대 {config.max_upload_mb} MB · 최대 {Math.floor(config.max_audio_seconds / 60)}분 ·
+                            분석 기록 자동 저장 없음
                           </p>
                         </div>
-                        <button
-                          className="button secondary-button"
-                          disabled={busy}
-                          onClick={() => fileInput.current?.click()}
-                        >
-                          파일 선택
-                          <Icon name="chevron" size={14} />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -643,8 +543,14 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                   )}
                   <div className="input-bottom">
                     <span className="input-hint">
-                      <Icon name="shield" size={14} />
-                      최대 {Math.floor(config.max_audio_seconds / 60)}분 · 분석 기록 자동 저장 없음
+                      <Icon name="upload" size={14} />
+                      <button
+                        className="button secondary-button file-pick-button"
+                        disabled={busy}
+                        onClick={() => fileInput.current?.click()}
+                      >
+                        {file ? '파일 변경' : '파일 선택'}
+                      </button>
                     </span>
                     {busy ? (
                       <button className="button secondary-button" onClick={cancelOperation}>
@@ -706,11 +612,9 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                       <p>
                         {recording
                           ? '발화가 인식되면 전사와 분석 결과가 순차적으로 표시됩니다.'
-                          : recordingSource === 'file'
-                            ? '선택한 파일을 마이크 재녹음 없이 직접 분석합니다.'
-                            : recordingSource === 'system'
-                              ? '선택한 PC 소리만 입력합니다. 오디오 공유를 선택하세요. 화면 영상은 전송하지 않습니다.'
-                              : '현장 대화는 마이크로, PC 통화는 통화 오디오 또는 파일 직접 입력으로 분석해 주세요.'}
+                          : recordingSource === 'system'
+                            ? '선택한 PC 소리만 입력합니다. 오디오 공유를 선택하세요. 화면 영상은 전송하지 않습니다.'
+                            : '현장 대화는 마이크로, PC 통화는 통화 오디오로 분석해 주세요.'}
                       </p>
                     </div>
                     <Waveform level={level} active={recording} />
@@ -727,7 +631,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                         disabled={busy} onChange={(event) => setRecordingSource(event.target.value)}>
                         <option value="microphone">마이크</option>
                         <option value="system">PC·통화 오디오</option>
-                        <option value="file" disabled={!file}>선택한 파일 직접 입력</option>
                       </select>
                     </span>
                     {recording ? (
@@ -742,8 +645,7 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                       </button>
                     ) : (
                       <button className="button primary-button" onClick={() => beginRecording()}
-                        disabled={busy || removingOperatorVoice || operatorVoiceSample === undefined ||
-                          (recordingSource === 'file' && (!file || durationExceeded))}>
+                        disabled={busy || removingOperatorVoice || operatorVoiceSample === undefined}>
                         <Icon name="mic" size={15} />
                         실시간 분석 시작
                       </button>
@@ -752,14 +654,14 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                   {audioUrl && !busy && <AudioPlayer key={audioUrl} src={audioUrl} onDuration={setDuration} />}
                 </>
               )}
-              <div className="privacy-status" role="note">
-                <Icon name="shield" size={14} />
-                {!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode)
-                  ? '개인정보 보호 설정을 확인한 뒤 분석할 수 있습니다.'
-                  : config.llm_external_enabled
-                    ? '식별정보 가림 적용 · 외부 AI 사용'
-                    : `외부 AI 전송 차단 · 서버 내부에서 분석${config.llm_features_enabled ? '' : ' · 요약·긴급도 AI 보류'}`}
-              </div>
+              {(!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode) || config.llm_external_enabled) && (
+                <div className="privacy-status" role="note">
+                  <Icon name="shield" size={14} />
+                  {!['local_only', 'redacted_cloud'].includes(config.llm_privacy_mode)
+                    ? '개인정보 보호 설정을 확인한 뒤 분석할 수 있습니다.'
+                    : '식별정보 가림 적용 · 외부 AI 사용'}
+                </div>
+              )}
               {busy && (
                 <div className="operation-status" role="status">
                   <Icon
@@ -851,7 +753,6 @@ function App({ onSignOut, operatorVoiceScope = 'local' } = {}) {
                 ) : (
                   <p className="muted small">서버 연결 후 분류 대상을 표시합니다.</p>
                 )}
-                {config.llm_features_enabled && <UrgencyScale />}
               </section>
               <section className="card example-card">
                 <div className="aside-heading">

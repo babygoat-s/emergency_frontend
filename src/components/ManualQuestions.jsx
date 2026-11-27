@@ -1,40 +1,7 @@
 import { formatManualSource, questionSources } from '../lib/manuals'
 import Icon from './Icon'
 
-const statuses = { confirmed: '확인됨', unknown: '미확인', uncertain: '불확실' }
 const priorities = { 1: '위험 조건 확인', 2: '필수 정보', 3: '주증상 핵심 질문', 4: '추가 확인' }
-const fields = {
-  location: '환자 위치',
-  callback: '연락처',
-  chief_complaint: '신고 내용',
-  age: '나이',
-  consciousness: '의식',
-  breathing: '호흡',
-  scene_safety: '현장 안전',
-  with_patient: '환자와 함께 있는지',
-  patient_count: '환자 수',
-  vomiting: '구토',
-  seizure: '경련',
-  chest_pain: '흉통',
-  severe_bleeding: '심한 출혈',
-  speech_difficulty: '말·발음',
-  paralysis: '얼굴·팔다리 마비',
-  sensory_change: '감각 변화',
-  symptom_onset: '증상 시작 시점',
-}
-const values = {
-  yes: '있음 / 예',
-  no: '없음 / 아니요',
-  alert: '의식 있음',
-  altered: '의식 변화 보고',
-  absent: '없음',
-  normal: '정상으로 보고',
-  abnormal: '비정상으로 보고',
-  present: '있음',
-  female: '여성',
-  male: '남성',
-}
-
 function Citation({ source }) {
   return (
     <div className="manual-citation">
@@ -94,38 +61,6 @@ export default function ManualQuestions({ result }) {
               </li>
             ))}
           </ol>
-        )}
-        <details className="manual-details">
-          <summary>상담 정보 확인 상태</summary>
-          <dl className="manual-state">
-            {Object.entries(fields).map(([field, label]) => {
-              const fact = result.state.fields[field]
-              return (
-                <div key={field}>
-                  <dt>{label}</dt>
-                  <dd>
-                    <strong className={`field-status status-${fact?.status || 'unknown'}`}>
-                      {statuses[fact?.status || 'unknown']}
-                    </strong>
-                    {fact?.value && <span>{values[fact.value] || fact.value}</span>}
-                    {fact?.evidence && <small>“{fact.evidence}”</small>}
-                  </dd>
-                </div>
-              )
-            })}
-          </dl>
-        </details>
-        {result.classification_references.length > 0 && (
-          <details className="manual-details">
-            <summary>긴급·응급·비응급 원문 조건</summary>
-            {result.classification_references.map((item, index) => (
-              <div className="manual-reference" key={index}>
-                <strong>{item.category}</strong>
-                <blockquote>{item.text}</blockquote>
-                <Citation source={item.source} />
-              </div>
-            ))}
-          </details>
         )}
         {result.instruction_references.length > 0 && (
           <details className="manual-details">
