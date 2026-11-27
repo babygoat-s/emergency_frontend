@@ -396,11 +396,6 @@ function App({ onSignOut } = {}) {
                 <h1>신고 음성 분석</h1>
                 <p>통화 전사와 환자 상태를 확인하고, 다음 상담 질문을 검토합니다.</p>
               </div>
-              <div className="page-actions">
-                <button className="icon-button guide-trigger" onClick={openGuide} aria-label="사용 안내">
-                  <Icon name="help" />
-                </button>
-              </div>
             </div>
             {connection === 'offline' && (
               <div className="connection-notice" role="status">
